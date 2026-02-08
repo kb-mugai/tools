@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<link rel="icon" href="favicon.png" type="image/png">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Web目線加工ツール｜Censor Bar Tool｜色付き目線・モザイクも可能</title>
+<meta name="description" content="Censor Bar（写真目線加工ツール）で簡単に目線を加工。Web上で登録不要・無料で使えます。">
+  <link rel="stylesheet" href="../common.css"> <!-- 共通 CSS -->
+<style>
+
+
+  body {
+    font-family: sans-serif;
+    margin: 10px;
+  }
+  canvas {
+    max-width: 100%;
+    max-height: 70vh; /* ← 表示上限 */
+    border: 1px solid #ccc;
+    touch-action: none;
+  }
+  .controls {
+    margin: 10px 0;
+  }
+</style>
+</head>
+<body>
+<a href="../"class="back-button">← トップページに戻る</a>
+<h1 class="page-title">Web目線加工ツール ver.1.0.0</h1>
+<p>画像に目線やモザイクをかけられるシンプルなWeb目線加工ツール</p>
+<p>画像はブラウザ上で処理されるため、外部サーバーに送信される事はありません</p>
+<input type="file" accept="image/*" id="imageInput" />
+
+<div class="controls">
+      モード：
+  <label>
+    <input type="radio" name="mode" value="bar" checked>
+    目線
+  </label>
+  <label>
+    <input type="radio" name="mode" value="mosaic">
+    モザイク
+  </label>
+  <br>
+    モザイク粒度：
+  <input type="range" id="mosaicSize" min="5">
+  <span id="mosaicValue"></span>
+<br>
+  太さ(共通) 　：
+<input type="range" id="barHeight" min="5" value="20">
+<span id="barValue"></span>
+
+  目線色：
+  <input type="color" id="barColor" value="#000000">
+  <button id="undoBtn">Undo</button><br>
+  <button id="saveBtn">画像保存</button>※新しいタブで画像を開きます（右クリックorタッチ長押しで保存してください）
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+let currentMode = "bar"; // 初期は黒目線
+
+const canvas = document.getElementById("canvas");
+document.querySelectorAll('input[name="mode"]').forEach(radio => {
+  radio.addEventListener("change", e => {
+    currentMode = e.target.value;
+    console.log("mode changed:", currentMode);
+  });
+});
+
+barHeight.addEventListener("input", () => {
+  barValue.textContent = barHeight.value + "px";
+});
+
+const ctx = canvas.getContext("2d");
+
+let img = new Image();
+let start = null;
+let bars = []; // ← 黒目線の履歴
+let originalFileName = ""; // 元ファイル名を保持
+// 画像読み込み
+document.getElementById("imageInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  originalFileName = file.name; // 元ファイル名を保存
+  const reader = new FileReader();
+  reader.onload = () => {
+img.onload = () => {
+  canvas.width = img.width;
+  canvas.height = img.height;
+
+
+
+  // 画像サイズ連動で太さ上限を設定
+  
+  const maxBar = Math.floor(Math.max(img.width, img.height) * 0.1);
+  barHeight.max = maxBar;
+  barHeight.value = Math.max(10, Math.floor(maxBar * 0.15));
+  barValue.textContent = barHeight.value + "px"; // 太さ表示
+  bars = [];
+  redraw();
+};
+
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+// 座標変換
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (canvas.width / rect.width),
+    y: (e.clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+
+// 再描画
+function redraw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0);
+  // ★ その上からモザイク
+  bars.filter(b => b.type === "mosaic").forEach(drawMosaic);
+  // ★ 先に黒目線
+  bars.filter(b => b.type === "bar").forEach(drawBar);
+
+
+
+  if (previewBar) {
+    if (previewBar.type === "bar") drawBar(previewBar);
+    else     drawPreviewRect(previewBar);
+  }
+}
+
+
+// 目線パス生成
+function createBarPath(bar) {
+  const { x1, y1, x2, y2, height } = bar;
+
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return ;
+
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy;
+  const py = ux;
+  const h = height / 2;
+
+  const p1 = { x: x1 + px * h, y: y1 + py * h };
+  const p2 = { x: x1 - px * h, y: y1 - py * h };
+  const p3 = { x: x2 - px * h, y: y2 - py * h };
+  const p4 = { x: x2 + px * h, y: y2 + py * h };
+
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.lineTo(p3.x, p3.y);
+  ctx.lineTo(p4.x, p4.y);
+  ctx.closePath();
+
+  return true;
+}
+
+
+// 黒目線描画
+function drawBar(bar) {
+  if (!createBarPath(bar)) return;
+
+  ctx.fillStyle = bar.color;
+  ctx.fill();
+}
+
+// モザイク描画用枠
+function getBarBBox(bar) {
+  const { x1, y1, x2, y2, height } = bar;
+
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return null;
+
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy;
+  const py = ux;
+  const h = height / 2;
+
+  const points = [
+    { x: x1 + px * h, y: y1 + py * h },
+    { x: x1 - px * h, y: y1 - py * h },
+    { x: x2 - px * h, y: y2 - py * h },
+    { x: x2 + px * h, y: y2 + py * h }
+  ];
+
+  const xs = points.map(p => p.x);
+  const ys = points.map(p => p.y);
+
+  return {
+    minX: Math.max(0, Math.floor(Math.min(...xs))),
+    minY: Math.max(0, Math.floor(Math.min(...ys))),
+    maxX: Math.min(canvas.width,  Math.ceil(Math.max(...xs))),
+    maxY: Math.min(canvas.height, Math.ceil(Math.max(...ys)))
+  };
+}
+
+
+// モザイク
+function drawMosaic(bar) {
+  ctx.save();
+
+  // 帯の形でクリップ
+  if (!createBarPath(bar)) {
+    ctx.restore();
+    return;
+  }
+  ctx.clip();
+
+  applyMosaic(bar);
+  ctx.closePath();
+  ctx.restore();
+}
+
+
+// モザイク本体
+function applyMosaic(bar) {
+  const size = bar.mosaicSize || 20;
+  const bbox = getBarBBox(bar);
+  if (!bbox) return;
+
+  const { minX, minY, maxX, maxY } = bbox;
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+const imgData = ctx.getImageData(minX, minY, maxX - minX, maxY - minY);
+const data = imgData.data;
+
+for (let y = 0; y < maxY - minY; y += size) {
+  for (let x = 0; x < maxX - minX; x += size) {
+    const cx = Math.min(x + size / 2, maxX - minX - 1);
+    const cy = Math.min(y + size / 2, maxY - minY - 1);
+    const i = (Math.floor(cy) * (maxX - minX) + Math.floor(cx)) * 4;
+
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.fillRect(minX + x, minY + y, size, size);
+  }
+}
+
+}
+
+
+
+
+// 操作開始
+canvas.addEventListener("pointerdown", e => {
+  start = getPos(e);
+});
+
+// 黒線プレビュー
+let previewBar = null;
+canvas.addEventListener("pointermove", e => {
+  if (!start) return;
+
+  const pos = getPos(e);
+
+  previewBar = {
+    type: currentMode,
+    x1: start.x,
+    y1: start.y,
+    x2: pos.x,
+    y2: pos.y,
+    height: parseInt(barHeight.value),
+    color: barColor.value,
+    mosaicSize: parseInt(mosaicSize.value)
+  };
+
+  redraw();
+});
+
+// モザイクプレビュー
+function drawPreviewRect(bar) {
+  const { x1, y1, x2, y2, height } = bar;
+
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return;
+
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy;
+  const py = ux;
+  const h = height / 2;
+
+  const p1 = { x: x1 + px * h, y: y1 + py * h };
+  const p2 = { x: x1 - px * h, y: y1 - py * h };
+  const p3 = { x: x2 - px * h, y: y2 - py * h };
+  const p4 = { x: x2 + px * h, y: y2 + py * h };
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(0,0,0,0.6)";
+  ctx.setLineDash([8, 4]);
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.lineTo(p3.x, p3.y);
+  ctx.lineTo(p4.x, p4.y);
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+
+// 確定
+canvas.addEventListener("pointerup", () => {
+  if (!previewBar) return;
+
+  bars.push(previewBar);
+  previewBar = null;
+  start = null;
+  redraw();
+});
+
+
+canvas.addEventListener("pointerleave", () => start = null);
+
+// Undo
+document.getElementById("undoBtn").addEventListener("click", () => {
+  if (bars.length === 0) return;
+  bars.pop();
+  redraw();
+});
+
+
+// 保存ボタン
+document.getElementById("saveBtn").addEventListener("click", () => {
+  canvas.toBlob(blob => {
+
+    // 元ファイル名に _edit を付ける
+    const dotIndex = originalFileName.lastIndexOf(".");
+    const name = dotIndex !== -1 
+      ? originalFileName.slice(0, dotIndex) + "_edit" + originalFileName.slice(dotIndex)
+      : originalFileName + "_edit";
+
+    // Blob から URL を作成
+    const url = URL.createObjectURL(blob);
+
+    // 新しいタブで開く
+    const win = window.open();
+    if (!win) return; // ポップアップブロック時
+
+    win.document.title = name;
+    const imgEl = win.document.createElement("img");
+    imgEl.src = url;
+    imgEl.style.maxWidth = "100%";
+    imgEl.style.height = "auto";
+    win.document.body.style.margin = "0";
+    win.document.body.style.display = "flex";
+    win.document.body.style.justifyContent = "center";
+    win.document.body.style.alignItems = "center";
+    win.document.body.style.height = "100vh";
+    win.document.body.appendChild(imgEl);
+
+    // ユーザーに保存方法を案内
+    const info = win.document.createElement("p");
+    info.textContent = "画像を長押し（スマホ）または右クリック（PC）して保存してください";
+    info.style.position = "absolute";
+    info.style.bottom = "10px";
+    info.style.width = "100%";
+    info.style.textAlign = "center";
+    info.style.color = "#333";
+    info.style.fontFamily = "sans-serif";
+    win.document.body.appendChild(info);
+
+  });
+});
+
+
+
+
+</script>
+
+</body>
+</html>

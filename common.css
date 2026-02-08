@@ -1,0 +1,42 @@
+/* ---------- ルートフォント固定 ---------- */
+html {
+  font-size: 16px;  /* 1rem = 16px 固定 */
+}
+
+/* ---------- 共通タイトル ---------- */
+h1 {
+  font-size: 2rem;       /* 32px相当 */
+  font-weight: bold;
+  margin-bottom: 20px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* ---------- トップページに戻るボタン ---------- */
+.back-button {
+  display: inline-block;
+  margin-bottom: 20px;
+  padding: 8px 16px;
+  background: #1a73e8;
+  color: white;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 1rem;       /* 16px 相当 */
+  transition: background 0.2s;
+}
+
+.back-button:hover {
+  background: #1558b0;
+}
+
+/* ---------- スマホ用調整 ---------- */
+@media (max-width: 600px) {
+  h1 {
+    font-size: 1.5rem;   /* 24pxに縮小 */
+  }
+  .back-button {
+    font-size: 0.9rem;   /* 14pxくらい */
+    padding: 6px 12px;
+  }
+}
