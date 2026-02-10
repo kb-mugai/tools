@@ -54,7 +54,8 @@
   目線色：
   <input type="color" id="barColor" value="#000000">
   <button id="undoBtn">Undo</button><br>
-  <button id="saveBtn">画像保存</button>※新しいタブで画像を開きます（右クリックorタッチ長押しで保存してください）
+<button id="savePcBtn">PC用：保存</button>
+<button id="saveMobileBtn">スマホ用：保存</button>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -342,50 +343,54 @@ document.getElementById("undoBtn").addEventListener("click", () => {
   redraw();
 });
 
+// ファイル保存共通関数
+function makeFileName(originalFileName) {
+  const dotIndex = originalFileName.lastIndexOf(".");
+  return dotIndex !== -1
+    ? originalFileName.slice(0, dotIndex) + "_edit" + originalFileName.slice(dotIndex)
+    : originalFileName + "_edit.png";
+}
 
-// 保存ボタン
-document.getElementById("saveBtn").addEventListener("click", () => {
+// PC用保存
+document.getElementById("savePcBtn").addEventListener("click", () => {
   canvas.toBlob(blob => {
-
-    // 元ファイル名に _edit を付ける
-    const dotIndex = originalFileName.lastIndexOf(".");
-    const name = dotIndex !== -1 
-      ? originalFileName.slice(0, dotIndex) + "_edit" + originalFileName.slice(dotIndex)
-      : originalFileName + "_edit";
-
-    // Blob から URL を作成
+    const name = makeFileName(originalFileName);
     const url = URL.createObjectURL(blob);
 
-    // 新しいタブで開く
-    const win = window.open();
-    if (!win) return; // ポップアップブロック時
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
 
-    win.document.title = name;
-    const imgEl = win.document.createElement("img");
-    imgEl.src = url;
-    imgEl.style.maxWidth = "100%";
-    imgEl.style.height = "auto";
-    win.document.body.style.margin = "0";
-    win.document.body.style.display = "flex";
-    win.document.body.style.justifyContent = "center";
-    win.document.body.style.alignItems = "center";
-    win.document.body.style.height = "100vh";
-    win.document.body.appendChild(imgEl);
-
-    // ユーザーに保存方法を案内
-    const info = win.document.createElement("p");
-    info.textContent = "画像を長押し（スマホ）または右クリック（PC）して保存してください";
-    info.style.position = "absolute";
-    info.style.bottom = "10px";
-    info.style.width = "100%";
-    info.style.textAlign = "center";
-    info.style.color = "#333";
-    info.style.fontFamily = "sans-serif";
-    win.document.body.appendChild(info);
-
+    URL.revokeObjectURL(url);
   });
 });
 
+// スマホ用保存
+document.getElementById("saveMobileBtn").addEventListener("click", async () => {
+  canvas.toBlob(async blob => {
+    const name = makeFileName(originalFileName);
+    const file = new File([blob], name, { type: blob.type });
+
+    if (!navigator.share || !navigator.canShare || !navigator.canShare({ files: [file] })) {
+      alert("この端末では共有保存が使えません。\nPC用保存をお試しください。");
+      return;
+    }
+
+    try {
+      await navigator.share({
+        files: [file],
+        title: "画像を保存",
+        text: "画像を保存してください"
+      });
+    } catch (err) {
+      // キャンセル時は何もしない
+      console.log("share cancelled", err);
+    }
+  });
+});
 
 
 
