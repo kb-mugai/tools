@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<link rel="icon" href="favicon.png" type="image/png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Web QRコードメーカー｜アイコン挿入・色指定（グラデーションタイプ）｜登録不要で無料で使えます</title>
+<meta name="description" content="簡単QRコードメーカー。アイコン挿入、色指定、グラデーションも可能。Web上で登録不要・無料で使えます。">
+  <link rel="stylesheet" href="../common.css"> <!-- 共通 CSS -->
+<style>
+body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    margin: 0;
+    width: 100%;
+
+    box-sizing: border-box;
+}
+
+
+
+/* テキスト入力 */
+#text-input {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    font-size: 16px;
+}
+
+/* 横並び行 */
+.row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 8px;
+    width: 100%;
+}
+
+/* 色指定・カラーピッカー */
+.row label { flex: 1; min-width: 60px; }
+.row select { flex: 2; }
+/* デフォルト：PC用（四角） */
+.row input[type="color"] {
+    flex: 1;
+    height: 36px;
+    border-radius: 4px;  /* 四角 */
+    padding: 0;
+    cursor: pointer;
+}
+
+input, button, select, textarea {
+  touch-action: manipulation;
+}
+
+
+/* 小さい画面（スマホ）用：丸型 */
+@media (max-width: 480px) {
+    .row input[type="color"] {
+        border-radius: 50%;  /* 丸型 */
+        height: 32px;
+    }
+}
+
+/* 方向ボタン */
+.angle-control button { flex: 1; cursor: pointer; }
+
+/* ロゴ選択とクリア */
+.logo-row input[type="file"] { flex: 3; }
+.logo-row button { flex: 1; }
+
+/* 保存ボタン横並び */
+.save-row { display: flex; gap: 5px; justify-content: center; width: 100%; margin-bottom: 10px; }
+.save-row button { flex: 1; }
+
+/* QRコード */
+#qrcode {
+    width: 100%;
+    max-width: 512px;
+    height: auto;
+    margin-top: 10px;
+    text-align: center;
+}
+
+.container {
+    width: 100%;
+    max-width: 600px;
+}
+
+
+/* 小さい画面用調整 */
+@media (max-width: 480px) {
+    .row input[type="color"] {
+        border-radius: 50%;  /* 丸型 */
+        height: 32px;
+    }
+}
+/* number input の上下ボタンを消す */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] { appearance: textfield; }
+</style>
+</head>
+<body>
+    <div class="container">
+    <a href="../"class="back-button">← トップページに戻る</a>
+
+<h1>QRコードメーカー ver.1.0.0</h1>
+<p>ロゴ挿入とグラデーション方向を選べるQRコードメーカー</p>
+<p>画像はブラウザ上で処理されるため、外部サーバーに送信される事はありません</p>
+<p>テキストやURLを入力してください</p>
+<input type="text" id="text-input" placeholder="ここに入力">
+
+<!-- 色指定・カラーピッカー -->
+<div class="row">
+    <label for="color-mode">色指定:</label>
+    <select id="color-mode">
+        <option value="single">単色</option>
+        <option value="linear-gradient">グラデーション（方向）</option>
+        <option value="radial-gradient">グラデーション（放射）</option>
+    </select>
+    <input type="color" id="color1" value="#000000">
+    <input type="color" id="color2" value="#000000">
+</div>
+
+<!-- 方向 -->
+<div class="row angle-control">
+    <label>方向（±）:</label>
+    <button id="angle-minus">-</button>
+    <button id="angle-plus">+</button>
+</div>
+
+<!-- ロゴ -->
+<div class="row logo-row">
+    <input type="file" id="logo-input" accept="image/*">
+    <button id="clear-logo">ロゴをクリア</button>
+</div>
+
+<!-- 保存ボタン -->
+<div class="save-row">
+    <button id="save-pc">PCでPNG保存</button>
+    <button id="save-mobile">スマホ向けPNG保存</button>
+    <button id="save-svg">SVG保存</button>
+</div>
+
+<div id="qrcode"></div>
+
+
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+<script>
+const textInput = document.getElementById("text-input");
+const colorMode = document.getElementById("color-mode");
+const color1 = document.getElementById("color1");
+const color2 = document.getElementById("color2");
+const angleMinus = document.getElementById("angle-minus");
+const anglePlus = document.getElementById("angle-plus");
+const logoInput = document.getElementById("logo-input");
+const savePcBtn = document.getElementById("save-pc");
+const saveMobileBtn = document.getElementById("save-mobile");
+const saveSvgBtn = document.getElementById("save-svg");
+const qrDiv = document.getElementById("qrcode");
+
+
+let logoFile = null;
+let angle = 45;
+
+// QR Code オブジェクト
+let qrCode = new QRCodeStyling({
+    width: 512,
+    height: 512,
+    margin: 10,
+    dotsOptions: { color: "#000000", type: "square" },
+    backgroundOptions: { color: "#ffffff" },
+    imageOptions: { crossOrigin: "anonymous", margin: 5 }
+});
+qrCode.append(qrDiv);
+
+// 1. 安定する8方向角度を配列に用意
+ const directions = [45, 52, 90, 135, 180, 256, 326, 0]; // 左上→上→右上→右→右下→下→左下→左
+//const directions = [1, 2, 3, 4, 5, 6, 7, 8]; // 左上→上→右上→右→右下→下→左下→左
+let currentIndex = 0; // 初期は左上
+
+// 2. +ボタン
+anglePlus.addEventListener("click", () => {
+    currentIndex = (currentIndex + 1) % directions.length;
+    angle = directions[currentIndex];
+    updateQRCode();
+});
+
+// 3. -ボタン
+angleMinus.addEventListener("click", () => {
+    currentIndex = (currentIndex - 1 + directions.length) % directions.length;
+    angle = directions[currentIndex];
+    updateQRCode();
+});
+
+// 4. 初回描画時も currentIndex を使って angle を設定
+angle = directions[currentIndex];
+updateQRCode();
+
+// 色モード切り替え
+colorMode.addEventListener("change", () => {
+    switch(colorMode.value){
+        case "single":
+            color2.disabled = true;
+            angleMinus.disabled = true;
+            anglePlus.disabled = true;
+            break;
+        case "linear-gradient":
+            color2.disabled = false;
+            angleMinus.disabled = false;
+            anglePlus.disabled = false;
+            break;
+        case "radial-gradient":
+            color2.disabled = false;
+            angleMinus.disabled = true;
+            anglePlus.disabled = true;
+            break;
+    }
+    updateQRCode();
+});
+
+// 初期状態
+color2.disabled = true;
+angleMinus.disabled = true;
+anglePlus.disabled = true;
+
+// ロゴ読み込み
+logoInput.addEventListener("change", (e) => {
+    logoFile = e.target.files[0] || null;
+    updateQRCode();
+});
+
+
+// ロゴをクリア
+const clearLogoBtn = document.getElementById("clear-logo");
+clearLogoBtn.addEventListener("click", () => {
+    logoFile = null;          // 選択したファイルをクリア
+    logoInput.value = "";     // ファイル入力リセット
+    updateQRCode();           // 再描画
+});
+
+// 色やテキスト変更で即再描画
+textInput.addEventListener("input", updateQRCode);
+color1.addEventListener("input", updateQRCode);
+color2.addEventListener("input", updateQRCode);
+
+
+// ページ読み込み時のQR幅を保存
+const initialSize = Math.min(window.innerWidth - 20, 512);
+
+// QRコード更新
+function updateQRCode() {
+    const text = textInput.value.trim();
+    if(!text) return;
+
+    // 画面幅に合わせる
+    const size = Math.min(window.innerWidth - 20, 512); // 画面端20px分余白を確保
+let options = {
+    width: initialSize,
+    height: initialSize,
+    data: text,
+    backgroundOptions: { color: "#ffffff" },
+    imageOptions: { crossOrigin: "anonymous", margin: 5 }
+};
+
+
+    if(logoFile) {
+        const reader = new FileReader();
+        reader.onload = function(evt){
+            options.image = evt.target.result;
+            renderQR(options);
+        };
+        reader.readAsDataURL(logoFile);
+    } else {
+        options.image = undefined; // ロゴなし
+        renderQR(options);
+    }
+}
+
+
+
+function renderQR(options){
+    if(colorMode.value === "single"){
+        options.dotsOptions = { type: "square", color: color1.value, gradient: undefined };
+    } else if(colorMode.value === "linear-gradient"){
+        options.dotsOptions = {
+            type: "square",
+            gradient: { 
+                type: "linear", 
+                rotation: angle, 
+                colorStops: [
+                    { offset:0, color: color1.value },
+                    { offset:1, color: color2.value }
+                ]
+            }
+        };
+    } else if(colorMode.value === "radial-gradient"){
+        options.dotsOptions = {
+            type: "square",
+            gradient: {
+                type: "radial",
+                colorStops: [
+                    { offset:0, color: color1.value },
+                    { offset:1, color: color2.value }
+                ]
+            }
+        };
+    }
+
+    qrCode.update(options);
+}
+
+// 保存ボタン
+savePcBtn.addEventListener("click", () => {
+    qrCode.update({ width: 512, height: 512 });
+    qrCode.download({ name: "qrcode_pc", extension: "png" });
+});
+saveMobileBtn.addEventListener("click", async () => {
+    try {
+        // QRCodeStyling の内部 canvas から Blob を作成
+        const canvas = qrDiv.querySelector("canvas");
+        if (!canvas) return alert("QRコードが生成されていません");
+
+        canvas.toBlob(async (blob) => {
+            if (!blob) return;
+
+            const file = new File([blob], "qrcode_mobile.png", { type: "image/png" });
+
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: "QRコード",
+                    text: "QRコードを共有します"
+                });
+            } else {
+                alert("この端末では共有できません");
+            }
+        });
+    } catch (err) {
+        console.error(err);
+        alert("共有に失敗しました");
+    }
+});
+
+saveSvgBtn.addEventListener("click", () => {
+    qrCode.download({ name: "qrcode", extension: "svg" });
+});
+
+// 初回描画
+updateQRCode();
+</script>
+</div>
+<script data-goatcounter="https://kb-mugai.goatcounter.com/count"async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
