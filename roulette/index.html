@@ -15,7 +15,7 @@ body {
   font-family: sans-serif;
   display: flex;
   flex-direction: column;
-  align-items: center;
+
   padding: 20px;
 }
 
@@ -103,11 +103,6 @@ input, button {
   min-height: 3.6em;
 }
 
-.page-title {
-  text-align: center;
-  font-size: 22px;
-  margin-bottom: 6px;
-}
 
 @media (max-width: 600px) {
 
@@ -153,13 +148,18 @@ input[type="number"] {
   appearance: textfield; /* Firefox */
 }
 
+.container {
+  width: min(90vw, 460px);
+  margin: 0 auto;
+}
 
 </style>
 </head>
 
 <body>
+  <div class="container">
 <a href="../"class="back-button">← トップページに戻る</a>
-<h1 class="page-title">Webカスタムルーレット ver.1.2.4</h1>
+<h1>Webカスタムルーレット ver.1.2.4</h1>
 <p>角度指定もできる、シンプルなWebカスタムルーレット</p>
 
 <div class="controls">
@@ -691,5 +691,6 @@ drawRoulette();
 </script>
 <script data-goatcounter="https://kb-mugai.goatcounter.com/count"
         async src="//gc.zgo.at/count.js"></script>
+  </div>
 </body>
 </html>
