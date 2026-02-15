@@ -29,6 +29,56 @@
     padding: 0 25px;     /* ★コンテナのpaddingと同じ値にすると、さらに完璧に揃う */
     box-sizing: border-box; /* パディングを含めて幅を計算 */
 }
+/* ボタンを横に並べるコンテナ */
+.share-area {
+    display: flex;
+    gap: 10px;          /* ボタン同士の隙間 */
+    margin-top: 20px;
+    width: 100%;        /* 親要素の幅に合わせる */
+}
+
+/* 共通のボタン基本スタイル */
+.share-area button {
+    flex: 1;            /* 1:1の比率で可能な限り広がる */
+    /* max-width: 180px; ← これがあると、広がりが止まってしまうので削除または大きくする */
+    padding: 15px 5px;  /* 上下パディングを少し増やして押しやすく */
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 16px;    /* 文字も少し大きくするとバランスが良いです */
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.share-area button:active {
+    transform: scale(0.95); /* 押した時に少し凹む演出 */
+}
+
+/* LINEボタン：ブランドカラー（緑） */
+.btn-line {
+    background-color: #06C755;
+}
+
+.btn-line:hover {
+    background-color: #05b34c;
+}
+
+/* Xボタン：ブランドカラー（黒） */
+.btn-x {
+    background-color: #000000;
+}
+
+.btn-x:hover {
+    background-color: #333333;
+}
+
+/* ちょっとしたアイコン代わりの絵文字 */
+.btn-line::before { content: "💬 "; margin-right: 5px; }
+.btn-x::before { content: "𝕏 "; margin-right: 5px; }
     </style>
 </head>
 <body>
@@ -36,7 +86,7 @@
         <a href="../" class="back-button">← トップページに戻る</a>
     </div>  
 <div class="container">
-        <h1>うんこ暗号化ツール　うんこ くりぷと</h1>
+        <h1>うんこくりぷとver.1.1.0</h1>
         <h1>💩 UNKO CRYPT 🚽</h1>
         素敵な暗号化ツール（ジョークの範囲でお使いください）
         <textarea id="input" placeholder="ここに平文または暗号文を入力..."></textarea>
@@ -53,8 +103,10 @@
 
         <p style="text-align: left; margin: 10px 0 5px; font-weight: bold;">結果:</p>
         <textarea id="output" readonly></textarea>
-        
-        <button onclick="shareUnko()" style="background:#00c300; color:white; width:100%; margin-top:5px; font-size:1.1em; border:none; border-radius:10px; padding:15px; font-weight:bold; cursor:pointer;">🚀 うんこを友達に送る (LINE/SNS)</button>
+<div class="share-area">
+    <button onclick="shareLINE()" class="btn-line">LINEで送る</button>
+    <button onclick="shareX()" class="btn-x">Xでポスト</button>
+</div>
         <button class="copy-btn" onclick="copyResult()" style="width:100%; margin-top:8px;">💩 うんこをコピーする</button>
 
         <p class="info">※このドメイン以外では正しく解読できません</p>
@@ -134,20 +186,55 @@ function copyResult() {
     });
 }
 
-// 【友達に送る】シェア機能
-async function shareUnko() {
+// 共通のデータ取得関数
+function getShareBase() {
     const text = document.getElementById('output').value;
-    if(!text) return alert("まずはうんこ化してください💩");
-    const shareData = {
-        title: 'うんこ暗号UNKO CRYPT',
-        text: text + "\n\n【解読サイト】\n",
-        url: window.location.href
-    };
-    try {
-        if (navigator.share) await navigator.share(shareData);
-        else { copyResult(); alert("うんこをコピーしました！LINE等に貼り付けてね"); }
-    } catch (err) { console.log(err); }
+    if(!text) {
+        alert("まずは暗号化してください💩");
+        return null;
+    }
+    const encodedData = encodeURIComponent(text);
+    const shareUrl = window.location.origin + window.location.pathname + "?d=" + encodedData;
+    return { text, shareUrl };
 }
+
+// --- LINE専用（密談：暗号＋データ付きURL） ---
+function shareLINE() {
+    const data = getShareBase(); // 暗号とデータ付きURLを取得
+    if(!data) return;
+
+    // LINEはそのままリンクを踏ませて即復号させたいので、データ付きURLを使用
+    const lineText = `${data.text}\n\n解読はこちら：\n${data.shareUrl}`;
+    const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(lineText)}`;
+    window.open(lineUrl, '_blank');
+}
+
+// --- X専用（拡散：暗号＋タグ＋短いURL） ---
+function shareX() {
+    const data = getShareBase();
+    if(!data) return;
+
+    // Xは「暗号そのもの」を本文に載せ、URLはデータを含まないトップURLにする
+    // これによりQRコード化してもスッキリする
+    const topUrl = window.location.origin + window.location.pathname; 
+    const xText = `${data.text}\n\n#うんこ暗号 #UNKO_CRYPT\n`;
+    
+    const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(xText)}&url=${encodeURIComponent(topUrl)}`;
+    
+    window.open(xUrl, '_blank');
+}
+// ページが開かれた時に実行される処理
+window.onload = function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const data = urlParams.get('d');
+    if (data) {
+        // URLに暗号データがあれば、上の入力欄にセットする
+        document.getElementById('input').value = data;
+        // ※ ここで doProcess(false) を呼ばなければ、自動復号はされません。
+        // ユーザーが自分で「復号」ボタンを押す楽しみが残ります！
+    }
+}
+
     </script>
     <script data-goatcounter="https://kb-mugai.goatcounter.com/count"async src="//gc.zgo.at/count.js"></script>
 </body>
