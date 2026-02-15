@@ -148,7 +148,7 @@ input[type="number"] { appearance: textfield; }
     <button id="save-mobile">スマホ向けPNG保存</button>
     <button id="save-svg">SVG保存</button>
 </div>
-
+※「QRコード」は株式会社デンソーウェーブの登録商標です
 <div id="qrcode"></div>
 
 
@@ -185,8 +185,7 @@ let qrCode = new QRCodeStyling({
 qrCode.append(qrDiv);
 
 // 1. 安定する8方向角度を配列に用意
- const directions = [45, 52, 90, 135, 180, 256, 326, 0]; // 左上→上→右上→右→右下→下→左下→左
-//const directions = [1, 2, 3, 4, 5, 6, 7, 8]; // 左上→上→右上→右→右下→下→左下→左
+ const directions = [45, 52, 90, 135, 180, 256, 326, 0]; // 左上→上→右上→右→右下→下→左下→左、角度は見た目と数値一致してない
 let currentIndex = 0; // 初期は左上
 
 // 2. +ボタン

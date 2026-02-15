@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<link rel="icon" href="favicon.png" type="image/png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+<title>Webパスワード強度チェッカー｜登録不要で無料で使えます</title>
+<meta name="description" content="Webパスワード強度チェッカー。ブラウザ完結動作。総当たり耐性チェック有り。登録不要・無料で使えます。">
+
+<link rel="stylesheet" href="../common.css">
+
+<style>
+body {
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.container {
+    width: 100%;
+    max-width: 600px;
+}
+
+/* 汎用入力 */
+input, textarea, select, button {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    font-size: 16px;
+    box-sizing: border-box;
+    touch-action: manipulation;
+}
+
+/* 横並び用 */
+.row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.row > * {
+    flex: 1;
+}
+
+
+
+
+  #score { font-weight: bold; margin-top: 1rem; }
+
+/* スマホ最適化 */
+@media (max-width: 480px) {
+    .row {
+        flex-direction: column;
+    }
+}
+</style>
+
+</head>
+<body>
+<div class="container">
+
+<a href="../" class="back-button">← トップページに戻る</a>
+
+<h1>Webパスワード強度チェッカー ver.1.0.0</h1>
+<p>シンプルなパスワード強度チェッカーです</p>
+処理はブラウザ上で完結するので外部へ送信されません。<br>
+<span style="color: red;">ただしお使いのブラウザ拡張機能等により、入力値の記憶や外部送信の可能性がありますので実際にお使いのパスワードは入力しないでください</span><br>
+
+<p>試したいパスワードを入力:
+<input type="text" id="pwd" placeholder="半角英数字・記号で入力してください" 
+       oninput="filterInput()">
+
+<button onclick="checkPassword()">評価する</button>
+
+
+<div id="score"></div>
+<div id="issues"></div>
+
+<script>
+let commonPasswords = [];
+let romajiWords = [];
+
+const loadTxt = (file, arr) => fetch(file)
+  .then(res => res.text())
+  .then(text => {
+    const lines = text.split(/\r?\n/).map(p => p.trim()).filter(p => p);
+    arr.push(...lines);
+  })
+  .catch(err => console.error(`${file} の読み込みに失敗しました:`, err));
+
+Promise.all([
+  loadTxt('1000-most-common-passwords.txt', commonPasswords),
+  loadTxt('japanese_1000_romaji_words.txt', romajiWords),
+]).then(() => console.log("辞書データのロードが完了しました"));
+
+function filterInput() {
+  const input = document.getElementById('pwd');
+  // 半角英数記号以外（全角文字）を即座に削除
+  input.value = input.value.replace(/[^\x20-\x7e]/g, "");
+}
+function checkPassword() {
+  const pwd = document.getElementById('pwd').value;
+  const scoreDiv = document.getElementById('score');
+  const issuesDiv = document.getElementById('issues');
+
+  if (pwd.length < 4) {
+    alert("パスワードは4文字以上にしてください");
+    return;
+  }
+
+  let issues = [];
+  let bonusScore = 0;
+  let patternChars = new Set();
+  const lowerPwd = pwd.toLowerCase();
+
+  // --- 1. 文字種ボーナス ---
+  const hasUpper = /[A-Z]/.test(pwd);
+  const hasLower = /[a-z]/.test(pwd);
+  const hasNumber = /[0-9]/.test(pwd);
+  const hasSymbol = /[^A-Za-z0-9]/.test(pwd);
+  const isTypicalUpper = /^[A-Z][a-z0-9!@#$%^&*()]+$/.test(pwd);
+
+  if (hasUpper) bonusScore += (isTypicalUpper ? 5 : 10);
+  if (hasLower) bonusScore += 10;
+  if (hasNumber) bonusScore += 10;
+  if (hasSymbol) bonusScore += 20;
+
+  // --- 2. 物理パターン判定 ---
+  const keyMap = {
+    '1':[0,0],'2':[1,0],'3':[2,0],'4':[3,0],'5':[4,0],'6':[5,0],'7':[6,0],'8':[7,0],'9':[8,0],'0':[9,0],
+    'q':[0,1],'w':[1,1],'e':[2,1],'r':[3,1],'t':[4,1],'y':[5,1],'u':[6,1],'i':[7,1],'o':[8,1],'p':[9,1],
+    'a':[0,2],'s':[1,2],'d':[2,2],'f':[3,2],'g':[4,2],'h':[5,2],'j':[6,2],'k':[7,2],'l':[8,2],
+    'z':[0,3],'x':[1,3],'c':[2,3],'v':[3,3],'b':[4,3],'n':[5,3],'m':[6,3],
+    'num7':[20,0],'num8':[21,0],'num9':[22,0],'num4':[20,1],'num5':[21,1],'num6':[22,1],'num1':[20,2],'num2':[21,2],'num3':[22,2],'num0':[20,3]
+  };
+  const getPos = (c) => (/[0-9]/.test(c) ? (keyMap['num'+c] || [20 + parseInt(c)%3, Math.floor(parseInt(c)/3)]) : keyMap[c]);
+
+  let adjCount = 0;
+  for (let i = 0; i < lowerPwd.length - 1; i++) {
+    const p1 = getPos(lowerPwd[i]);
+    const p2 = getPos(lowerPwd[i+1]);
+    if (p1 && p2) {
+      const dx = Math.abs(p1[0] - p2[0]);
+      const dy = Math.abs(p1[1] - p2[1]);
+      if (dx <= 1 && dy <= 1) {
+        adjCount++;
+        if (adjCount >= 2) {
+          [i-1, i, i+1].forEach(idx => patternChars.add(idx));
+          issues.push("キーボードやテンキーの並び（縦・横・斜め）が含まれています");
+        }
+      } else { adjCount = 0; }
+    } else { adjCount = 0; }
+  }
+
+  // --- 3. 辞書・連番・誕生日チェック ---
+  const repeatMatch = pwd.match(/(.)\1{2,}/g);
+  if (repeatMatch) {
+    issues.push("同じ文字の繰り返しが含まれています");
+    pwd.split('').forEach((c, idx) => { if(new RegExp(c+"{3,}").test(pwd)) patternChars.add(idx); });
+  }
+
+  [...commonPasswords, ...romajiWords].forEach(word => {
+    if (word.length >= 3 && lowerPwd.includes(word.toLowerCase())) {
+      issues.push("推測されやすい一般的な単語が含まれています");
+      let startIdx = lowerPwd.indexOf(word.toLowerCase());
+      for(let j=0; j<word.length; j++) patternChars.add(startIdx + j);
+    }
+  });
+
+  const datePattern = /(19|20)\d{2}|(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/g;
+  if (datePattern.test(pwd)) {
+    issues.push("日付や西暦と思われる数字が含まれています");
+    pwd.split('').forEach((c, idx) => { if(/[0-9]/.test(c)) patternChars.add(idx); });
+  }
+
+  // --- 4. スコア合算 ---
+  let lengthScore = 0;
+  for (let i = 0; i < pwd.length; i++) {
+    lengthScore += patternChars.has(i) ? 2 : 7;
+  }
+  let totalRaw = lengthScore + bonusScore;
+  let finalScore = Math.min(100, Math.floor((totalRaw / 130) * 100));
+
+// --- 5. 仕上げのペナルティ ---
+  const typeCount = [hasUpper, hasLower, hasNumber, hasSymbol].filter(Boolean).length;
+
+  // 文字種に関する具体的なアドバイス
+  if (typeCount < 4) {
+    let missingTypes = [];
+    if (!hasUpper) missingTypes.push("大文字");
+    if (!hasLower) missingTypes.push("小文字");
+    if (!hasNumber) missingTypes.push("数字");
+    if (!hasSymbol) missingTypes.push("記号");
+
+    issues.push(`現在、使用されている文字は${typeCount}種類です。さらに「${missingTypes.join('、')}」を混ぜることを推奨します。`);
+    
+    // 1種類のみの場合は大幅減点
+    if (typeCount <= 1) {
+      finalScore = Math.min(finalScore, 25);
+    }
+  }
+
+  // 12文字未満は、どんなに頑張っても90点（非常に強力）の壁を超えられない設定
+  if (pwd.length < 12) {
+    finalScore = Math.min(finalScore, 89);
+  }
+
+  // 完全一致する最弱パスワード
+  if (commonPasswords.includes(pwd)) finalScore = 0;
+
+  // --- 6. 評価判定 ---
+  let rating = ""; let comment = ""; let color = "";
+  if (finalScore === 0) { rating = "論外"; comment = "逆に凄い！子供でも総当たり突破できるレベル"; color = "#ff1744"; }
+  else if (finalScore <= 25) { rating = "超危険"; comment = "こんなん超危険なパスワードです"; color = "#ff1744"; }
+  else if (finalScore <= 50) { rating = "警告"; comment = "この程度でさらに使い回しなんてしてないだろうな・・・？"; color = "#ff9100"; }
+  else if (finalScore <= 75) { rating = "不十分"; comment = "まだ足りない。まだ足りないんだよ。"; color = "#ffd600"; }
+  else if (finalScore <= 99) { rating = "良好"; comment = "かなり強い！あとはしっかり管理しよう。"; color = "#2962ff"; }
+  else { rating = "最強"; comment = "パスワード長くて複雑で俺TUEEしてたら肝心な時に思い出せないでござるの巻"; color = "#00c853"; }
+
+  // --- 7. 解析時間計算 ---
+  const getAnalysis = (p) => {
+    let R = 0;
+    if (/[0-9]/.test(p)) R += 10; if (/[a-z]/.test(p)) R += 26;
+    if (/[A-Z]/.test(p)) R += 26; if (/[^A-Za-z0-9]/.test(p)) R += 33;
+    const seconds = Math.pow(R, p.length) / 100000000000;
+    let t = "";
+    if (seconds < 1) t = "一瞬（1秒未満）";
+    else if (seconds < 31536000) t = "1年以内";
+    else if (seconds < 3153600000) t = "100年以内（一生安泰）";
+    else if (seconds < 5e9 * 31536000) t = "50億年以上（地球滅亡まで解読不能）";
+    else if (seconds < 1e20) t = "100京年以上（銀河消滅まで解読不能）";
+    else t = "測定不能（宇宙の熱的死まで解読不能でござる）";
+    return t;
+  };
+
+  const timeResult = getAnalysis(pwd);
+
+// --- 8. 最終表示 ---
+  
+  // 指摘事項のHTMLを作成
+  const uniqueIssues = [...new Set(issues)];
+  const showSuccess = uniqueIssues.length === 0 && finalScore >= 90;
+  const issuesHTML = `
+    <div id="issues-container" style="margin-bottom: 1.5rem;">
+      <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">指摘事項:</h3>
+      ${showSuccess 
+        ? "<p style='color:green; font-weight:bold;'>素晴らしい！脆弱なパターンは見当たりません。</p>" 
+        : "<ul style='color: #d32f2f; font-size: 0.9rem; background: #fff5f5; padding: 1rem 1rem 1rem 2rem; border-radius: 8px; border: 1px solid #ffcdd2;'>" + uniqueIssues.map(i => `<li>${i}</li>`).join('') + "</ul>"}
+    </div>
+  `;
+
+  // 全体を統合して scoreDiv に流し込む（issuesDivは空にする）
+  scoreDiv.innerHTML = `
+    ${issuesHTML}
+
+    <div style="border: 2px solid ${color}; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; background: white;">
+        <div style="font-size: 0.9rem; color: #666;">総合スコア</div>
+        <div style="color:${color}; font-size:2.5rem; font-weight:bold;">${finalScore}<span style="font-size:1rem; color:#888;"> / 100</span></div>
+        <div style="color:${color}; font-weight:bold; font-size:1.2rem; margin-bottom:0.5rem;">評価: ${rating}</div>
+        <p style="font-style:italic; color:#444; background:#f9f9f9; padding:0.5rem; border-left:4px solid ${color};">"${comment}"</p>
+    </div>
+
+    <div style="margin-top: 1.5rem; padding: 1rem; background: #222; color: #eee; border-radius: 8px; font-family: monospace;">
+        <div style="font-family: sans-serif; font-weight: normal; font-size: 0.85rem; color: #aaa; margin-bottom: 8px;">
+          おまけ（総当たり攻撃耐性チェック）：
+        </div>
+        <div style="border-top: 1px dashed #444; padding-top: 8px; color: #00ff00;">
+          [ATTACKER_SIMULATION]<br>
+          ■ Spec: NVIDIA RTX 4090 (100GH/s)<br>
+          ■ Method: Offline Brute-force<br>
+          ■ ETA: <span style="color: #ff3d00; font-weight:bold;">${timeResult}</span>
+        </div>
+    </div>
+  `;
+
+}
+</script>
+<script data-goatcounter="https://kb-mugai.goatcounter.com/count"async src="//gc.zgo.at/count.js"></script>
+</div>
+</body>
+</html>
