@@ -199,6 +199,17 @@ window.onload = function() {
     }
 }
 </script>
+<script>
+    window.goatcounter = {
+        path: function(p) {
+            // URLから ?d=... の部分を削除したパスをGoatCounterに送る
+            var url = new URL(location.href);
+            url.searchParams.delete('d'); // 'd'パラメータを消去
+            return url.pathname; // パス名（/index.htmlなど）だけを返す
+        }
+    };
+</script>
 <script data-goatcounter="https://kb-mugai.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+
 </body>
 </html>
