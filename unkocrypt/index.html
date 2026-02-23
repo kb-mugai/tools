@@ -41,7 +41,7 @@
         <a href="../" class="back-button">← トップページに戻る</a>
     </div>  
     <div class="container">
-        <h1>うんこ暗号 ver.1.1.5</h1>
+        <h1>うんこ暗号 ver.1.1.6</h1>
         <h1>💩 うんこくりぷと 🚽</h1>
         素敵な暗号化ツール（ジョークの範囲でお使いください）
         <textarea id="input" placeholder="ここに言葉を入力してね。"></textarea>
@@ -69,7 +69,7 @@
     </div>
 
 <script>
-// 1. テーブル（重複なし・爆発系音勢ver）‥
+// 1. テーブル（重複なし・爆発系音勢ver）
 const T = ["ぶ","💩","💨","パ","💢","ボ","💦","🤎","ッ","リ","ブ","！","∵","‥","ビ","チ"];
 const SALT = 99;
 
@@ -87,23 +87,35 @@ function doProcess(isEnc) {
     let res = "";
     try {
         if(isEnc) {
+            // --- 【IV実装】ランダムなIV(0-255)を生成し、先頭2文字に変換 ---
+            const iv = Math.floor(Math.random() * 256);
+            const ivHex = iv.toString(16).padStart(2, '0');
+            res += T[parseInt(ivHex[0], 16)] + T[parseInt(ivHex[1], 16)];
+
             const bytes = new TextEncoder().encode(input);
             bytes.forEach((b, i) => {
-                let s = (b + seed + (i*11)) % 256;
+                // seedと位置(i)に加えて、今回のIVを混ぜる
+                let s = (b + seed + iv + (i*11)) % 256;
                 let h = s.toString(16).padStart(2, '0');
-                // 1バイト(00-ff)を2つの💩系文字に変換
                 res += T[parseInt(h[0], 16)] + T[parseInt(h[1], 16)];
             });
         } else {
-            // 絵文字を正確に分割（Array.fromを使用）
             const emos = Array.from(input);
             const bytes = [];
-            for(let i=0; i<emos.length; i+=2) {
+            
+            // --- 【IV実装】先頭の2文字からIVを復元 ---
+            const ivH1 = T.indexOf(emos[0]).toString(16);
+            const ivH2 = T.indexOf(emos[1]).toString(16);
+            const iv = parseInt(ivH1 + ivH2, 16);
+
+            // 3文字目（インデックス2）からデータ本体として処理
+            for(let i=2; i<emos.length; i+=2) {
                 const h1 = T.indexOf(emos[i]).toString(16);
                 const h2 = T.indexOf(emos[i+1]).toString(16);
                 if(h1 === "-1" || h2 === "-1") throw new Error();
                 let s = parseInt(h1 + h2, 16);
-                bytes.push((s - seed - ((i/2)*11) % 256 + 256) % 256);
+                // 暗号化時と同じくIVを差し引く（+512はマイナス対策）
+                bytes.push((s - seed - iv - ((i-2)/2*11) % 256 + 512) % 256);
             }
             res = new TextDecoder().decode(new Uint8Array(bytes));
         }
@@ -112,7 +124,6 @@ function doProcess(isEnc) {
         document.getElementById('output').value = "💩 うんこ戻せません！正しいうんこを入れてね"; 
     }
 }
-
 function swapText() {
     const out = document.getElementById('output').value;
     if(!out || out.includes("戻せません")) return;
