@@ -1,9 +1,15 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+        <link rel="icon" href="favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate Monster Voice Designer Pro</title>
+    <title>8bit風モンスター声メーカー|Lo-Fi Monster Voice Gen</title>
+    <meta name="description" content="初代ポ●モン風のレトロ鳴き声をテキストから生成します。Web上で登録不要・無料で使えます。">
+  <link rel="stylesheet" href="../common.css"> <!-- 共通 CSS -->
     <style>
         :root { --primary: #4ecca3; --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #c9d1d9; --accent: #da3633; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
@@ -30,6 +36,7 @@
         .rec-btn { background: var(--accent); color: #fff; }
         button.main-action:hover { filter: brightness(1.2); transform: translateY(-1px); }
         button.main-action:disabled { opacity: 0.5; cursor: not-allowed; }
+                .nav-wrapper { max-width: 850px; margin: 0 auto 10px; text-align: left; padding: 0 25px; box-sizing: border-box; }
 
         .visual-box { height: 80px; background: #000; border-radius: 8px; margin-top: 20px; border: 2px solid var(--border); overflow: hidden; position: relative; }
         canvas { width: 100%; height: 100%; }
@@ -37,15 +44,18 @@
     </style>
 </head>
 <body>
-
+    <div class="nav-wrapper">
+        <a href="../" class="back-button">← トップページに戻る</a>
+    </div>  
 <div class="container">
+
     <h1>
-        <span>👾 Ultimate Monster Voice Designer Pro</span>
+        <span>Lo-Fi Monster Voice Generator ver1.0.0</span>
         <button class="share-btn-top" onclick="shareConfig()">🔗 URLで設定をシェア</button>
     </h1>
 
     <div class="section">
-        <label>なきごえのタネ (テキスト入力)</label>
+        <label>なきごえのタネ (Text入力)</label>
         <input type="text" id="txMsg" value="KAIJU-MONSTER" maxlength="20">
     </div>
 
@@ -55,24 +65,24 @@
             <div class="param">
                 <label>OSC1 波形 / 高さ (Start) / 変化幅 (Step)</label>
                 <select id="wave1" style="margin-bottom:8px;">
-                    <option value="triangle" selected>まるい (Triangle)</option>
+                    <option value="triangle">まるい (Triangle)</option>
                     <option value="square">カクカク (Square)</option>
-                    <option value="sawtooth">ギザギザ (Sawtooth)</option>
+                    <option value="sawtooth" selected>ギザギザ (Sawtooth)</option>
                     <option value="sine">すっきり (Sine)</option>
                 </select>
-                <div class="input-row"><input type="range" id="f1S_r" min="50" max="4000" value="600" oninput="sync(this,'f1S_n')"><input type="number" id="f1S_n" value="600" oninput="sync(this,'f1S_r')">Hz</div>
-                <div class="input-row" style="margin-top:8px;"><input type="range" id="f1T_r" min="0" max="1500" value="150" oninput="sync(this,'f1T_n')"><input type="number" id="f1T_n" value="150" oninput="sync(this,'f1T_r')">Hz</div>
+                <div class="input-row"><input type="range" id="f1S_r" min="50" max="4000" value="250" oninput="sync(this,'f1S_n')"><input type="number" id="f1S_n" value="250" oninput="sync(this,'f1S_r')">Hz</div>
+                <div class="input-row" style="margin-top:8px;"><input type="range" id="f1T_r" min="0" max="1500" value="15" oninput="sync(this,'f1T_n')"><input type="number" id="f1T_n" value="15" oninput="sync(this,'f1T_r')">Hz</div>
             </div>
             <div class="param" style="border-top:1px solid var(--border); padding-top:15px;">
                 <label>OSC2 波形 / 高さ (Start) / 変化幅 (Step)</label>
                 <select id="wave2" style="margin-bottom:8px;">
                     <option value="triangle">まるい (Triangle)</option>
-                    <option value="square" selected>カクカク (Square)</option>
-                    <option value="sawtooth">ギザギザ (Sawtooth)</option>
+                    <option value="square">カクカク (Square)</option>
+                    <option value="sawtooth" selected>ギザギザ (Sawtooth)</option>
                     <option value="sine">すっきり (Sine)</option>
                 </select>
-                <div class="input-row"><input type="range" id="f2S_r" min="50" max="6000" value="1200" oninput="sync(this,'f2S_n')"><input type="number" id="f2S_n" value="1200" oninput="sync(this,'f2S_r')">Hz</div>
-                <div class="input-row" style="margin-top:8px;"><input type="range" id="f2T_r" min="0" max="1500" value="300" oninput="sync(this,'f2T_n')"><input type="number" id="f2T_n" value="300" oninput="sync(this,'f2T_r')">Hz</div>
+                <div class="input-row"><input type="range" id="f2S_r" min="50" max="6000" value="1000" oninput="sync(this,'f2S_n')"><input type="number" id="f2S_n" value="1000" oninput="sync(this,'f2S_r')">Hz</div>
+                <div class="input-row" style="margin-top:8px;"><input type="range" id="f2T_r" min="0" max="1500" value="30" oninput="sync(this,'f2T_n')"><input type="number" id="f2T_n" value="30" oninput="sync(this,'f2T_r')">Hz</div>
             </div>
         </div>
 
@@ -80,18 +90,18 @@
             <div class="section-title">Texture (質感・余韻)</div>
             <div class="param">
                 <label>音の表情 (Attack / Release)</label>
-                <div class="input-row"><span style="font-size:10px;color:#8b949e;width:40px;">Attack</span><input type="range" id="att_r" min="0" max="150" value="10" oninput="sync(this,'att_n')"><input type="number" id="att_n" value="10" oninput="sync(this,'att_r')">ms</div>
+                <div class="input-row"><span style="font-size:10px;color:#8b949e;width:40px;">Attack</span><input type="range" id="att_r" min="0" max="150" value="0" oninput="sync(this,'att_n')"><input type="number" id="att_n" value="0" oninput="sync(this,'att_r')">ms</div>
                 <div class="hint" style="margin-left:50px;margin-bottom:8px;">0でカチッ、150でふわっ</div>
-                <div class="input-row"><span style="font-size:10px;color:#8b949e;width:40px;">Release</span><input type="range" id="rel_r" min="0" max="500" value="80" oninput="sync(this,'rel_n')"><input type="number" id="rel_n" value="80" oninput="sync(this,'rel_r')">ms</div>
+                <div class="input-row"><span style="font-size:10px;color:#8b949e;width:40px;">Release</span><input type="range" id="rel_r" min="0" max="500" value="200" oninput="sync(this,'rel_n')"><input type="number" id="rel_n" value="200" oninput="sync(this,'rel_r')">ms</div>
                 <div class="hint" style="margin-left:50px;">0でパツン、500でスゥーッ</div>
             </div>
             <div class="param" style="border-top:1px solid var(--border); padding-top:15px;">
                 <label>ノイズの量 (Mix %)</label>
-                <div class="input-row"><input type="range" id="nMix_r" min="0" max="100" value="25" oninput="sync(this,'nMix_n')"><input type="number" id="nMix_n" value="25" oninput="sync(this,'nMix_r')">%</div>
+                <div class="input-row"><input type="range" id="nMix_r" min="0" max="100" value="35" oninput="sync(this,'nMix_n')"><input type="number" id="nMix_n" value="35" oninput="sync(this,'nMix_r')">%</div>
             </div>
             <div class="param">
                 <label>ノイズの鋭さ (Color Hz)</label>
-                <div class="input-row"><input type="range" id="nFreq_r" min="100" max="10000" value="2000" oninput="sync(this,'nFreq_n')"><input type="number" id="nFreq_n" value="2000" oninput="sync(this,'nFreq_r')">Hz</div>
+                <div class="input-row"><input type="range" id="nFreq_r" min="100" max="10000" value="3000" oninput="sync(this,'nFreq_n')"><input type="number" id="nFreq_n" value="3000" oninput="sync(this,'nFreq_r')">Hz</div>
                 <div class="hint">低いと「ゴゴゴ」、高いと「シャー」</div>
             </div>
         </div>
@@ -107,7 +117,7 @@
             </div>
             <div class="param">
                 <label>なめらかさ (Portamento)</label>
-                <div class="input-row"><input type="range" id="p_r" min="0" max="100" value="25" oninput="sync(this,'p_n')"><input type="number" id="p_n" value="25" oninput="sync(this,'p_r')"></div>
+                <div class="input-row"><input type="range" id="p_r" min="0" max="100" value="10" oninput="sync(this,'p_n')"><input type="number" id="p_n" value="10" oninput="sync(this,'p_r')"></div>
                 <div class="hint">0でカチカチ、100でヌルヌル</div>
             </div>
         </div>
@@ -348,5 +358,7 @@ function draw() {
 // 描画ループ開始
 draw();
 </script>
+<script data-goatcounter="https://kb-mugai.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
