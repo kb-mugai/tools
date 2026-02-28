@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Web Acoustic Text Transfer v0.1</title>
+<style>
+body { font-family: sans-serif; text-align:center; padding:20px; }
+textarea { width:80%; height:80px; }
+button { margin:10px; padding:10px 20px; }
+#output { margin-top:20px; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<h2>Web Acoustic Text Transfer</h2>
+
+<button onclick="setMode('send')">送信モード</button>
+<button onclick="setMode('receive')">受信モード</button>
+
+<div id="sendArea">
+<textarea id="textInput" placeholder="送信するテキスト"></textarea><br>
+<button onclick="sendText()">送信開始</button>
+</div>
+
+<div id="receiveArea" style="display:none;">
+<button onclick="startReceive()">受信開始</button>
+<div id="output"></div>
+</div>
+
+<script>
+let mode = "send";
+let audioCtx;
+let analyser;
+let micStream;
+let receiving = false;
+
+const BIT_DURATION = 0.02; // 秒
+const FREQ0 = 1200;
+const FREQ1 = 2200;
+
+function setMode(m) {
+  mode = m;
+  document.getElementById("sendArea").style.display = m==="send"?"block":"none";
+  document.getElementById("receiveArea").style.display = m==="receive"?"block":"none";
+}
+
+function textToBinary(text){
+  return text.split('').map(c =>
+    c.charCodeAt(0).toString(2).padStart(8,'0')
+  ).join('');
+}
+
+function binaryToText(bin){
+  let result="";
+  for(let i=0;i<bin.length;i+=8){
+    let byte = bin.slice(i,i+8);
+    if(byte.length===8)
+      result += String.fromCharCode(parseInt(byte,2));
+  }
+  return result;
+}
+
+async function sendText(){
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  gain.gain.value = 0.2;
+
+  const text = document.getElementById("textInput").value;
+  const data = "11111110" + textToBinary(text) + "00000000";
+
+  let currentTime = audioCtx.currentTime;
+  osc.start();
+
+  for(let bit of data){
+    osc.frequency.setValueAtTime(bit==="0"?FREQ0:FREQ1, currentTime);
+    currentTime += BIT_DURATION;
+  }
+
+  osc.stop(currentTime);
+}
+
+async function startReceive(){
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  const source = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  source.connect(analyser);
+
+  receiving = true;
+  let buffer = new Float32Array(analyser.frequencyBinCount);
+  let bits = "";
+  let lastTime = 0;
+
+  function detect(){
+    if(!receiving) return;
+    analyser.getFloatFrequencyData(buffer);
+
+    let maxIndex = 0;
+    for(let i=1;i<buffer.length;i++){
+      if(buffer[i] > buffer[maxIndex])
+        maxIndex = i;
+    }
+
+    let freq = maxIndex * audioCtx.sampleRate / analyser.fftSize;
+    let bit = (Math.abs(freq-FREQ1) < Math.abs(freq-FREQ0)) ? "1":"0";
+
+    let now = performance.now();
+    if(now - lastTime > BIT_DURATION*1000){
+      bits += bit;
+      lastTime = now;
+    }
+
+    requestAnimationFrame(detect);
+  }
+
+  detect();
+
+  setTimeout(()=>{
+    receiving = false;
+    let start = bits.indexOf("11111110");
+    let end = bits.indexOf("00000000", start+8);
+    if(start !== -1 && end !== -1){
+      let data = bits.slice(start+8, end);
+      document.getElementById("output").innerText =
+        "受信結果: " + binaryToText(data);
+    } else {
+      document.getElementById("output").innerText =
+        "受信失敗";
+    }
+  }, 10000);
+}
+</script>
+
+</body>
+</html>
