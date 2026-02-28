@@ -50,13 +50,13 @@
 <div class="container">
 
     <h1>
-        <span>Lo-Fi Monster Voice Generator ver1.0.1</span>
+        <span>Lo-Fi Monster Voice Generator ver1.0.2</span>
         <button class="share-btn-top" onclick="shareConfig()">🔗 URLで設定をシェア</button>
       </h1>
-テキストをレトロな音声データに変換します。初代ポ●モンやR2-●2、FAX風の音声が生成できます。
+<p>テキストをレトロな音声データに変換します。初代ポ●モンやR2-●2、FAX風の音声が生成できます。</p>
     <div class="section">
         <label>なきごえのタネ (Text入力)</label>
-        <input type="text" id="txMsg" value="KAIJU-MONSTER" maxlength="20">
+        <input type="text" id="txMsg" value="KAIJU-MONSTER" maxlength="500">
     </div>
 
     <div class="control-grid">
@@ -139,14 +139,14 @@ let audioCtx, analyser, dataArray, animationId;
 const canvas = document.getElementById('visualizer');
 const ctx = canvas.getContext('2d');
 
-// スライダーと数値入力の同期、およびURLハッシュのクリア
 function sync(src, targetId) { 
     document.getElementById(targetId).value = src.value;
-    // 設定が変わったらシェア用のハッシュをクリア（古い設定と混同しないため）
-    if(window.location.hash) history.replaceState(null, null, ' ');
+    // 設定変更時はクエリとハッシュをクリア（古いリンクとの混同防止）
+    if(window.location.search || window.location.hash) {
+        history.replaceState(null, null, window.location.pathname);
+    }
 }
 
-// ホワイトノイズ生成バッファ
 function createNoiseBuffer(ctx) {
     const bufferSize = ctx.sampleRate * 2;
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
@@ -156,6 +156,7 @@ function createNoiseBuffer(ctx) {
 }
 
 async function generate(isRecord = false) {
+    // スマホ対応: コンテキスト生成とレジューム
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
@@ -177,14 +178,12 @@ async function generate(isRecord = false) {
     const mainGain = audioCtx.createGain();
     const noiseGain = audioCtx.createGain();
     
-    // OSC1, OSC2 設定
     const osc1 = audioCtx.createOscillator();
     const osc2 = audioCtx.createOscillator();
     osc1.type = document.getElementById('wave1').value;
     osc2.type = document.getElementById('wave2').value;
     osc1.connect(mainGain); osc2.connect(mainGain);
     
-    // ノイズ設定
     const noiseSource = audioCtx.createBufferSource();
     noiseSource.buffer = createNoiseBuffer(audioCtx);
     noiseSource.loop = true;
@@ -194,23 +193,20 @@ async function generate(isRecord = false) {
     noiseSource.connect(noiseFilter);
     noiseFilter.connect(noiseGain);
 
-    // 解析器（Analyser）の設定
     analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048; // 波形の解像度
-    const bufferLength = analyser.frequencyBinCount;
-    dataArray = new Uint8Array(bufferLength);
+    analyser.fftSize = 2048;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-    // 全体を統合
     const finalGain = audioCtx.createGain();
     mainGain.connect(finalGain);
     noiseGain.connect(finalGain);
-    finalGain.connect(analyser); // 解析器を通す
-    analyser.connect(audioCtx.destination); // 解析後にスピーカーへ
-    finalGain.connect(dest); // 録音用
+    finalGain.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    finalGain.connect(dest);
 
     finalGain.gain.setValueAtTime(0, audioCtx.currentTime);
     mainGain.gain.value = 0.3;
-    noiseGain.gain.value = nMix * 0.8; // ノイズが強すぎないよう微調整
+    noiseGain.gain.value = nMix * 0.8;
 
     let recorder, chunks = [];
     if (isRecord) {
@@ -220,12 +216,12 @@ async function generate(isRecord = false) {
             const blob = new Blob(chunks, { type: 'audio/webm' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = `voice_${msg.substring(0,8)}.webm`; a.click();
+            a.href = url; a.download = `voice_${Date.now()}.webm`; a.click();
         };
         recorder.start();
     }
 
-    let now = audioCtx.currentTime + 0.05; // 少し未来から開始して安定させる
+    let now = audioCtx.currentTime + 0.05;
     osc1.start(now); osc2.start(now); noiseSource.start(now);
 
     const f1S = +document.getElementById('f1S_n').value;
@@ -233,131 +229,116 @@ async function generate(isRecord = false) {
     const f2S = +document.getElementById('f2S_n').value;
     const f2T = +document.getElementById('f2T_n').value;
 
+    // 長文ループ
     for (let i = 0; i < msg.length; i++) {
         const code = msg.charCodeAt(i);
         const freq1 = f1S + ((code >> 4 & 0x0F) * f1T);
         const freq2 = f2S + ((code & 0x0F) * f2T);
 
-        // 周波数の遷移（ポルタメント）
         osc1.frequency.setTargetAtTime(freq1, now, porta / 2 + 0.001);
         osc2.frequency.setTargetAtTime(freq2, now, porta / 2 + 0.001);
-        
-        // 音量エンベロープ (Attack)
         finalGain.gain.setTargetAtTime(0.5, now, attack / 2 + 0.001);
-        
         now += dMs;
     }
 
-    // Release apply
     const endTime = now;
     finalGain.gain.setTargetAtTime(0.0001, endTime, release / 3 + 0.001);
     
-    // すべての音源を停止
     const stopTime = endTime + release + 0.2;
     osc1.stop(stopTime); osc2.stop(stopTime); noiseSource.stop(stopTime);
 
-    // 再生終了後の処理
     setTimeout(() => {
         if (isRecord && recorder.state === 'recording') recorder.stop();
         playBtn.disabled = recBtn.disabled = false;
-        analyser = null; // 描画ループを停止させる
+        analyser = null; 
     }, (stopTime - audioCtx.currentTime) * 1000);
 }
 
-// 🔗 設定シェア機能 (URL fragmentを利用)
+// 🔗 進化した設定シェア機能 (長文対応)
 function shareConfig() {
-    const ids = [
-        'txMsg', 'wave1', 'f1S_n', 'f1T_n', 'wave2', 'f2S_n', 'f2T_n',
-        'att_n', 'rel_n', 'nMix_n', 'nFreq_n', 'dMs_n', 'p_n'
-    ];
-    // 全設定値をJSONにまとめる
-    const config = {};
-    ids.forEach(id => config[id] = document.getElementById(id).value);
+    // 波形名を1文字に短縮して保存容量を節約
+    const wMap = { triangle:'t', square:'s', sawtooth:'a', sine:'i' };
     
-    // JSON -> 圧縮文字列 (Base64)
-    try {
-        const json = JSON.stringify(config);
-        const base64 = btoa(unescape(encodeURIComponent(json)));
-        const shareURL = window.location.origin + window.location.pathname + '#' + base64;
-        
-        // クリップボードへコピー
-        navigator.clipboard.writeText(shareURL).then(() => {
-            alert("🔗 設定URLをコピーしました！\nSNSやメールでシェアして、この音を再現できます。");
-        });
-    } catch(e) {
-        alert("シェアURLの作成に失敗しました。テキストが特殊すぎる可能性があります。");
-    }
+    const settings = [
+        wMap[document.getElementById('wave1').value],
+        +document.getElementById('f1S_n').value,
+        +document.getElementById('f1T_n').value,
+        wMap[document.getElementById('wave2').value],
+        +document.getElementById('f2S_n').value,
+        +document.getElementById('f2T_n').value,
+        +document.getElementById('att_n').value,
+        +document.getElementById('rel_n').value,
+        +document.getElementById('nMix_n').value,
+        +document.getElementById('nFreq_n').value,
+        +document.getElementById('dMs_n').value,
+        +document.getElementById('p_n').value
+    ];
+
+    const msg = document.getElementById('txMsg').value;
+    // 設定はBase64、テキストは通常のURIエンコードで分離
+    const configB64 = btoa(JSON.stringify(settings));
+    const shareURL = `${window.location.origin}${window.location.pathname}?c=${configB64}&m=${encodeURIComponent(msg)}`;
+    
+    navigator.clipboard.writeText(shareURL).then(() => {
+        alert("🔗 長文対応のシェアURLをコピーしました！");
+    });
 }
 
-// ページ読み込み時のURL復元処理
+// ページ読み込み時のURL復元処理 (クエリパラメータ優先)
 window.addEventListener('load', () => {
-    if (window.location.hash) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const configB64 = urlParams.get('c');
+    const msg = urlParams.get('m');
+
+    if (configB64 && msg) {
         try {
-            const base64 = window.location.hash.substring(1);
-            const json = decodeURIComponent(escape(atob(base64)));
-            const config = JSON.parse(json);
+            const s = JSON.parse(atob(configB64));
+            const rMap = { t:'triangle', s:'square', a:'sawtooth', i:'sine' };
+            const ids = [
+                'wave1', 'f1S_n', 'f1T_n', 'wave2', 'f2S_n', 'f2T_n',
+                'att_n', 'rel_n', 'nMix_n', 'nFreq_n', 'dMs_n', 'p_n'
+            ];
             
-            // 各UIに値をセットし、スライダーと同期
-            Object.keys(config).forEach(id => {
-                const input = document.getElementById(id);
-                if(input) {
-                    input.value = config[id];
-                    // number入力の場合は対応するrangeスライダーも更新
-                    if(id.endsWith('_n')) {
-                        const rangeId = id.replace('_n', '_r');
-                        const rangeInput = document.getElementById(rangeId);
-                        if(rangeInput) rangeInput.value = config[id];
-                    }
+            // テキスト復元
+            document.getElementById('txMsg').value = decodeURIComponent(msg);
+
+            // 各パラメータ復元
+            ids.forEach((id, i) => {
+                const val = (id.startsWith('wave')) ? rMap[s[i]] : s[i];
+                const el = document.getElementById(id);
+                if(el) {
+                    el.value = val;
+                    const rEl = document.getElementById(id.replace('_n', '_r'));
+                    if(rEl) rEl.value = val;
                 }
             });
-            console.log("✅ URLから設定を復元しました。");
-        } catch (e) {
-            console.error("❌ URLハッシュの解析に失敗しました。", e);
-        }
+            console.log("✅ 長文設定を復元しました。");
+        } catch (e) { console.error("Restore Error", e); }
     }
 });
 
-// 本物のリアルタイム・オシロスコープ (Time Domain Visualizer)
 function draw() {
     animationId = requestAnimationFrame(draw);
-    
-    // 背景塗りつぶし
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     if (!analyser || !dataArray) {
-        // 鳴っていない時はフラットな線
         ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.beginPath();
         ctx.moveTo(0, canvas.height/2); ctx.lineTo(canvas.width, canvas.height/2);
-        ctx.stroke();
-        return;
+        ctx.stroke(); return;
     }
-
-    // 解析器から現在の波形データを取得
     analyser.getByteTimeDomainData(dataArray);
-
-    ctx.strokeStyle = '#4ecca3'; // primary color
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-
+    ctx.strokeStyle = '#4ecca3'; ctx.lineWidth = 2; ctx.beginPath();
     const sliceWidth = canvas.width * 1.0 / dataArray.length;
     let x = 0;
-
     for (let i = 0; i < dataArray.length; i++) {
-        // データは 0～255。これを -1.0～1.0 に変換
-        const v = dataArray[i] / 128.0; 
-        const y = v * canvas.height / 2; // 中央が canvas.height/2
-
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-
+        const v = dataArray[i] / 128.0;
+        const y = v * canvas.height / 2;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         x += sliceWidth;
     }
-    // 最後の点を画面端に
     ctx.lineTo(canvas.width, canvas.height / 2);
     ctx.stroke();
 }
-// 描画ループ開始
 draw();
 </script>
 <script data-goatcounter="https://kb-mugai.goatcounter.com/count"
