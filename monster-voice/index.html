@@ -50,10 +50,10 @@
 <div class="container">
 
     <h1>
-        <span>Lo-Fi Monster Voice Generator ver1.0.0</span>
+        <span>Lo-Fi Monster Voice Generator ver1.0.1</span>
         <button class="share-btn-top" onclick="shareConfig()">🔗 URLで設定をシェア</button>
-    </h1>
-
+      </h1>
+テキストをレトロな音声データに変換します。初代ポ●モンやR2-●2、FAX風の音声が生成できます。
     <div class="section">
         <label>なきごえのタネ (Text入力)</label>
         <input type="text" id="txMsg" value="KAIJU-MONSTER" maxlength="20">
@@ -156,7 +156,9 @@ function createNoiseBuffer(ctx) {
 }
 
 async function generate(isRecord = false) {
-    if (!audioCtx) audioCtx = new AudioContext();
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
     if (audioCtx.state === 'suspended') await audioCtx.resume();
 
     const msg = document.getElementById('txMsg').value || " ";
