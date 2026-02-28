@@ -1,139 +1,352 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>Web Acoustic Text Transfer v0.1</title>
-<style>
-body { font-family: sans-serif; text-align:center; padding:20px; }
-textarea { width:80%; height:80px; }
-button { margin:10px; padding:10px 20px; }
-#output { margin-top:20px; font-weight:bold; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Monster Voice Designer Pro</title>
+    <style>
+        :root { --primary: #4ecca3; --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #c9d1d9; --accent: #da3633; }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
+        .container { max-width: 850px; margin: 0 auto; background: var(--panel); padding: 25px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { font-size: 1.3rem; color: var(--primary); margin-top: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+        .share-btn-top { font-size: 12px; background: #21262d; color: var(--primary); border: 1px solid var(--border); padding: 5px 10px; border-radius: 6px; cursor: pointer; }
+        .share-btn-top:hover { background: #30363d; }
+        
+        .section { background: var(--bg); border: 1px solid var(--border); padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .section-title { font-size: 11px; font-weight: bold; color: #8b949e; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+        .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 600px) { .control-grid { grid-template-columns: 1fr; } }
+        
+        .param { margin-bottom: 15px; }
+        label { font-size: 11px; display: block; color: var(--primary); margin-bottom: 6px; font-weight: bold; }
+        .input-row { display: flex; align-items: center; gap: 10px; }
+        input[type="range"] { flex: 1; accent-color: var(--primary); cursor: pointer; }
+        input[type="number"] { width: 70px; background: var(--panel); color: var(--primary); border: 1px solid var(--border); padding: 5px; border-radius: 4px; font-size: 12px; font-family: monospace; }
+        select, input[type="text"] { width: 100%; background: var(--bg); color: #fff; border: 1px solid var(--border); padding: 10px; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        
+        .btn-group { display: flex; gap: 15px; margin-top: 25px; }
+        button.main-action { flex: 1; padding: 18px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .play-btn { background: #238636; color: #fff; }
+        .rec-btn { background: var(--accent); color: #fff; }
+        button.main-action:hover { filter: brightness(1.2); transform: translateY(-1px); }
+        button.main-action:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .visual-box { height: 80px; background: #000; border-radius: 8px; margin-top: 20px; border: 2px solid var(--border); overflow: hidden; position: relative; }
+        canvas { width: 100%; height: 100%; }
+        .osc-label { position: absolute; top: 5px; right: 5px; font-size: 9px; color: #333; font-family: monospace; }
+    </style>
 </head>
 <body>
 
-<h2>Web Acoustic Text Transfer</h2>
+<div class="container">
+    <h1>
+        <span>👾 Ultimate Monster Voice Designer Pro</span>
+        <button class="share-btn-top" onclick="shareConfig()">🔗 URLで設定をシェア</button>
+    </h1>
 
-<button onclick="setMode('send')">送信モード</button>
-<button onclick="setMode('receive')">受信モード</button>
+    <div class="section">
+        <label>なきごえのタネ (テキスト入力)</label>
+        <input type="text" id="txMsg" value="KAIJU-MONSTER" maxlength="20">
+    </div>
 
-<div id="sendArea">
-<textarea id="textInput" placeholder="送信するテキスト"></textarea><br>
-<button onclick="sendText()">送信開始</button>
-</div>
+    <div class="control-grid">
+        <div class="section">
+            <div class="section-title">Tone (基本の音色)</div>
+            <div class="param">
+                <label>OSC1 波形 / 高さ (Start) / 変化幅 (Step)</label>
+                <select id="wave1" style="margin-bottom:8px;">
+                    <option value="triangle" selected>まるい (Triangle)</option>
+                    <option value="square">カクカク (Square)</option>
+                    <option value="sawtooth">ギザギザ (Sawtooth)</option>
+                    <option value="sine">すっきり (Sine)</option>
+                </select>
+                <div class="input-row"><input type="range" id="f1S_r" min="50" max="4000" value="600" oninput="sync(this,'f1S_n')"><input type="number" id="f1S_n" value="600" oninput="sync(this,'f1S_r')">Hz</div>
+                <div class="input-row" style="margin-top:8px;"><input type="range" id="f1T_r" min="0" max="1500" value="150" oninput="sync(this,'f1T_n')"><input type="number" id="f1T_n" value="150" oninput="sync(this,'f1T_r')">Hz</div>
+            </div>
+            <div class="param" style="border-top:1px solid var(--border); padding-top:15px;">
+                <label>OSC2 波形 / 高さ (Start) / 変化幅 (Step)</label>
+                <select id="wave2" style="margin-bottom:8px;">
+                    <option value="triangle">まるい (Triangle)</option>
+                    <option value="square" selected>カクカク (Square)</option>
+                    <option value="sawtooth">ギザギザ (Sawtooth)</option>
+                    <option value="sine">すっきり (Sine)</option>
+                </select>
+                <div class="input-row"><input type="range" id="f2S_r" min="50" max="6000" value="1200" oninput="sync(this,'f2S_n')"><input type="number" id="f2S_n" value="1200" oninput="sync(this,'f2S_r')">Hz</div>
+                <div class="input-row" style="margin-top:8px;"><input type="range" id="f2T_r" min="0" max="1500" value="300" oninput="sync(this,'f2T_n')"><input type="number" id="f2T_n" value="300" oninput="sync(this,'f2T_r')">Hz</div>
+            </div>
+        </div>
 
-<div id="receiveArea" style="display:none;">
-<button onclick="startReceive()">受信開始</button>
-<div id="output"></div>
+        <div class="section">
+            <div class="section-title">Texture (質感・余韻)</div>
+            <div class="param">
+                <label>音の表情 (Attack / Release)</label>
+                <div class="input-row"><span style="font-size:10px;color:#8b949e;width:40px;">Attack</span><input type="range" id="att_r" min="0" max="150" value="10" oninput="sync(this,'att_n')"><input type="number" id="att_n" value="10" oninput="sync(this,'att_r')">ms</div>
+                <div class="hint" style="margin-left:50px;margin-bottom:8px;">0でカチッ、150でふわっ</div>
+                <div class="input-row"><span style="font-size:10px;color:#8b949e;width:40px;">Release</span><input type="range" id="rel_r" min="0" max="500" value="80" oninput="sync(this,'rel_n')"><input type="number" id="rel_n" value="80" oninput="sync(this,'rel_r')">ms</div>
+                <div class="hint" style="margin-left:50px;">0でパツン、500でスゥーッ</div>
+            </div>
+            <div class="param" style="border-top:1px solid var(--border); padding-top:15px;">
+                <label>ノイズの量 (Mix %)</label>
+                <div class="input-row"><input type="range" id="nMix_r" min="0" max="100" value="25" oninput="sync(this,'nMix_n')"><input type="number" id="nMix_n" value="25" oninput="sync(this,'nMix_r')">%</div>
+            </div>
+            <div class="param">
+                <label>ノイズの鋭さ (Color Hz)</label>
+                <div class="input-row"><input type="range" id="nFreq_r" min="100" max="10000" value="2000" oninput="sync(this,'nFreq_n')"><input type="number" id="nFreq_n" value="2000" oninput="sync(this,'nFreq_r')">Hz</div>
+                <div class="hint">低いと「ゴゴゴ」、高いと「シャー」</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Global</div>
+        <div class="control-grid">
+            <div class="param">
+                <label>再生スピード (Speed ms)</label>
+                <div class="input-row"><input type="range" id="dMs_r" min="10" max="500" value="80" oninput="sync(this,'dMs_n')"><input type="number" id="dMs_n" value="80" oninput="sync(this,'dMs_r')">ms</div>
+                <div class="hint">1文字あたりの長さ</div>
+            </div>
+            <div class="param">
+                <label>なめらかさ (Portamento)</label>
+                <div class="input-row"><input type="range" id="p_r" min="0" max="100" value="25" oninput="sync(this,'p_n')"><input type="number" id="p_n" value="25" oninput="sync(this,'p_r')"></div>
+                <div class="hint">0でカチカチ、100でヌルヌル</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="visual-box">
+        <canvas id="visualizer"></canvas>
+        <div class="osc-label">REAL-TIME OSCILLOSCOPE</div>
+    </div>
+
+    <div class="btn-group">
+        <button id="playBtn" class="main-action play-btn" onclick="generate(false)">PREVIEW ▶️</button>
+        <button id="recBtn" class="main-action rec-btn" onclick="generate(true)">EXPORT .WEBM ⏺️</button>
+    </div>
 </div>
 
 <script>
-let mode = "send";
-let audioCtx;
-let analyser;
-let micStream;
-let receiving = false;
+let audioCtx, analyser, dataArray, animationId;
+const canvas = document.getElementById('visualizer');
+const ctx = canvas.getContext('2d');
 
-const BIT_DURATION = 0.02; // 秒
-const FREQ0 = 1200;
-const FREQ1 = 2200;
-
-function setMode(m) {
-  mode = m;
-  document.getElementById("sendArea").style.display = m==="send"?"block":"none";
-  document.getElementById("receiveArea").style.display = m==="receive"?"block":"none";
+// スライダーと数値入力の同期、およびURLハッシュのクリア
+function sync(src, targetId) { 
+    document.getElementById(targetId).value = src.value;
+    // 設定が変わったらシェア用のハッシュをクリア（古い設定と混同しないため）
+    if(window.location.hash) history.replaceState(null, null, ' ');
 }
 
-function textToBinary(text){
-  return text.split('').map(c =>
-    c.charCodeAt(0).toString(2).padStart(8,'0')
-  ).join('');
+// ホワイトノイズ生成バッファ
+function createNoiseBuffer(ctx) {
+    const bufferSize = ctx.sampleRate * 2;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    return buffer;
 }
 
-function binaryToText(bin){
-  let result="";
-  for(let i=0;i<bin.length;i+=8){
-    let byte = bin.slice(i,i+8);
-    if(byte.length===8)
-      result += String.fromCharCode(parseInt(byte,2));
-  }
-  return result;
-}
+async function generate(isRecord = false) {
+    if (!audioCtx) audioCtx = new AudioContext();
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-async function sendText(){
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-  gain.gain.value = 0.2;
+    const msg = document.getElementById('txMsg').value || " ";
+    const dMs = +document.getElementById('dMs_n').value / 1000;
+    const porta = +document.getElementById('p_n').value / 1000;
+    const attack = +document.getElementById('att_n').value / 1000;
+    const release = +document.getElementById('rel_n').value / 1000;
+    const nMix = +document.getElementById('nMix_n').value / 100;
+    const nFreq = +document.getElementById('nFreq_n').value;
 
-  const text = document.getElementById("textInput").value;
-  const data = "11111110" + textToBinary(text) + "00000000";
+    const playBtn = document.getElementById('playBtn');
+    const recBtn = document.getElementById('recBtn');
+    playBtn.disabled = recBtn.disabled = true;
 
-  let currentTime = audioCtx.currentTime;
-  osc.start();
+    const dest = audioCtx.createMediaStreamDestination();
+    const mainGain = audioCtx.createGain();
+    const noiseGain = audioCtx.createGain();
+    
+    // OSC1, OSC2 設定
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    osc1.type = document.getElementById('wave1').value;
+    osc2.type = document.getElementById('wave2').value;
+    osc1.connect(mainGain); osc2.connect(mainGain);
+    
+    // ノイズ設定
+    const noiseSource = audioCtx.createBufferSource();
+    noiseSource.buffer = createNoiseBuffer(audioCtx);
+    noiseSource.loop = true;
+    const noiseFilter = audioCtx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    noiseFilter.frequency.value = nFreq;
+    noiseSource.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
 
-  for(let bit of data){
-    osc.frequency.setValueAtTime(bit==="0"?FREQ0:FREQ1, currentTime);
-    currentTime += BIT_DURATION;
-  }
+    // 解析器（Analyser）の設定
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048; // 波形の解像度
+    const bufferLength = analyser.frequencyBinCount;
+    dataArray = new Uint8Array(bufferLength);
 
-  osc.stop(currentTime);
-}
+    // 全体を統合
+    const finalGain = audioCtx.createGain();
+    mainGain.connect(finalGain);
+    noiseGain.connect(finalGain);
+    finalGain.connect(analyser); // 解析器を通す
+    analyser.connect(audioCtx.destination); // 解析後にスピーカーへ
+    finalGain.connect(dest); // 録音用
 
-async function startReceive(){
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
-  const source = audioCtx.createMediaStreamSource(stream);
-  analyser = audioCtx.createAnalyser();
-  analyser.fftSize = 2048;
-  source.connect(analyser);
+    finalGain.gain.setValueAtTime(0, audioCtx.currentTime);
+    mainGain.gain.value = 0.3;
+    noiseGain.gain.value = nMix * 0.8; // ノイズが強すぎないよう微調整
 
-  receiving = true;
-  let buffer = new Float32Array(analyser.frequencyBinCount);
-  let bits = "";
-  let lastTime = 0;
-
-  function detect(){
-    if(!receiving) return;
-    analyser.getFloatFrequencyData(buffer);
-
-    let maxIndex = 0;
-    for(let i=1;i<buffer.length;i++){
-      if(buffer[i] > buffer[maxIndex])
-        maxIndex = i;
+    let recorder, chunks = [];
+    if (isRecord) {
+        recorder = new MediaRecorder(dest.stream);
+        recorder.ondataavailable = e => chunks.push(e.data);
+        recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: 'audio/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `voice_${msg.substring(0,8)}.webm`; a.click();
+        };
+        recorder.start();
     }
 
-    let freq = maxIndex * audioCtx.sampleRate / analyser.fftSize;
-    let bit = (Math.abs(freq-FREQ1) < Math.abs(freq-FREQ0)) ? "1":"0";
+    let now = audioCtx.currentTime + 0.05; // 少し未来から開始して安定させる
+    osc1.start(now); osc2.start(now); noiseSource.start(now);
 
-    let now = performance.now();
-    if(now - lastTime > BIT_DURATION*1000){
-      bits += bit;
-      lastTime = now;
+    const f1S = +document.getElementById('f1S_n').value;
+    const f1T = +document.getElementById('f1T_n').value;
+    const f2S = +document.getElementById('f2S_n').value;
+    const f2T = +document.getElementById('f2T_n').value;
+
+    for (let i = 0; i < msg.length; i++) {
+        const code = msg.charCodeAt(i);
+        const freq1 = f1S + ((code >> 4 & 0x0F) * f1T);
+        const freq2 = f2S + ((code & 0x0F) * f2T);
+
+        // 周波数の遷移（ポルタメント）
+        osc1.frequency.setTargetAtTime(freq1, now, porta / 2 + 0.001);
+        osc2.frequency.setTargetAtTime(freq2, now, porta / 2 + 0.001);
+        
+        // 音量エンベロープ (Attack)
+        finalGain.gain.setTargetAtTime(0.5, now, attack / 2 + 0.001);
+        
+        now += dMs;
     }
 
-    requestAnimationFrame(detect);
-  }
+    // Release apply
+    const endTime = now;
+    finalGain.gain.setTargetAtTime(0.0001, endTime, release / 3 + 0.001);
+    
+    // すべての音源を停止
+    const stopTime = endTime + release + 0.2;
+    osc1.stop(stopTime); osc2.stop(stopTime); noiseSource.stop(stopTime);
 
-  detect();
-
-  setTimeout(()=>{
-    receiving = false;
-    let start = bits.indexOf("11111110");
-    let end = bits.indexOf("00000000", start+8);
-    if(start !== -1 && end !== -1){
-      let data = bits.slice(start+8, end);
-      document.getElementById("output").innerText =
-        "受信結果: " + binaryToText(data);
-    } else {
-      document.getElementById("output").innerText =
-        "受信失敗";
-    }
-  }, 10000);
+    // 再生終了後の処理
+    setTimeout(() => {
+        if (isRecord && recorder.state === 'recording') recorder.stop();
+        playBtn.disabled = recBtn.disabled = false;
+        analyser = null; // 描画ループを停止させる
+    }, (stopTime - audioCtx.currentTime) * 1000);
 }
+
+// 🔗 設定シェア機能 (URL fragmentを利用)
+function shareConfig() {
+    const ids = [
+        'txMsg', 'wave1', 'f1S_n', 'f1T_n', 'wave2', 'f2S_n', 'f2T_n',
+        'att_n', 'rel_n', 'nMix_n', 'nFreq_n', 'dMs_n', 'p_n'
+    ];
+    // 全設定値をJSONにまとめる
+    const config = {};
+    ids.forEach(id => config[id] = document.getElementById(id).value);
+    
+    // JSON -> 圧縮文字列 (Base64)
+    try {
+        const json = JSON.stringify(config);
+        const base64 = btoa(unescape(encodeURIComponent(json)));
+        const shareURL = window.location.origin + window.location.pathname + '#' + base64;
+        
+        // クリップボードへコピー
+        navigator.clipboard.writeText(shareURL).then(() => {
+            alert("🔗 設定URLをコピーしました！\nSNSやメールでシェアして、この音を再現できます。");
+        });
+    } catch(e) {
+        alert("シェアURLの作成に失敗しました。テキストが特殊すぎる可能性があります。");
+    }
+}
+
+// ページ読み込み時のURL復元処理
+window.addEventListener('load', () => {
+    if (window.location.hash) {
+        try {
+            const base64 = window.location.hash.substring(1);
+            const json = decodeURIComponent(escape(atob(base64)));
+            const config = JSON.parse(json);
+            
+            // 各UIに値をセットし、スライダーと同期
+            Object.keys(config).forEach(id => {
+                const input = document.getElementById(id);
+                if(input) {
+                    input.value = config[id];
+                    // number入力の場合は対応するrangeスライダーも更新
+                    if(id.endsWith('_n')) {
+                        const rangeId = id.replace('_n', '_r');
+                        const rangeInput = document.getElementById(rangeId);
+                        if(rangeInput) rangeInput.value = config[id];
+                    }
+                }
+            });
+            console.log("✅ URLから設定を復元しました。");
+        } catch (e) {
+            console.error("❌ URLハッシュの解析に失敗しました。", e);
+        }
+    }
+});
+
+// 本物のリアルタイム・オシロスコープ (Time Domain Visualizer)
+function draw() {
+    animationId = requestAnimationFrame(draw);
+    
+    // 背景塗りつぶし
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (!analyser || !dataArray) {
+        // 鳴っていない時はフラットな線
+        ctx.strokeStyle = '#222'; ctx.lineWidth = 1; ctx.beginPath();
+        ctx.moveTo(0, canvas.height/2); ctx.lineTo(canvas.width, canvas.height/2);
+        ctx.stroke();
+        return;
+    }
+
+    // 解析器から現在の波形データを取得
+    analyser.getByteTimeDomainData(dataArray);
+
+    ctx.strokeStyle = '#4ecca3'; // primary color
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+
+    const sliceWidth = canvas.width * 1.0 / dataArray.length;
+    let x = 0;
+
+    for (let i = 0; i < dataArray.length; i++) {
+        // データは 0～255。これを -1.0～1.0 に変換
+        const v = dataArray[i] / 128.0; 
+        const y = v * canvas.height / 2; // 中央が canvas.height/2
+
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+
+        x += sliceWidth;
+    }
+    // 最後の点を画面端に
+    ctx.lineTo(canvas.width, canvas.height / 2);
+    ctx.stroke();
+}
+// 描画ループ開始
+draw();
 </script>
-
 </body>
 </html>
