@@ -43,7 +43,7 @@ button{ padding:12px 24px; border-radius:25px; background:rgba(255,255,255,0.05)
 <div class="nav-wrapper">
   <a href="../" class="back-button">← トップページに戻る</a>
 </div>
-<h1>SOUND COMPASS ver1.1.0</h1>
+<h1>SOUND COMPASS ver1.1.1</h1>
 <p>音で方位を示すコンパスです。北基準と相対基準（現在角度指定）モードを切替できます。</p>
 <div class="compass">
   <div class="dial" id="dial"><div class="target-marker" id="targetMarker"></div></div>
@@ -152,7 +152,7 @@ function processSound() {
     osc.frequency.setTargetAtTime(1000, audioCtx.currentTime, 0.03);
     gainNode.gain.setTargetAtTime(0.3, audioCtx.currentTime, 0.03);
   } else if(absDiff >= 175){
-    osc.frequency.setTargetAtTime(200, audioCtx.currentTime, 0.03);
+    osc.frequency.setTargetAtTime(400, audioCtx.currentTime, 0.03);
     gainNode.gain.setTargetAtTime(0.3, audioCtx.currentTime, 0.03);
   } else {
     gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.03);
@@ -168,7 +168,7 @@ function beep(absDiff){
   if(!soundEnabled || !audioCtx || audioCtx.state !== 'running') return;
   const o = audioCtx.createOscillator();
   const g = audioCtx.createGain();
-  o.type = "square";
+  o.type = "triangle";
   const freq = 300 + (1 - Math.min(absDiff, 180)/180) * 600;
   o.frequency.value = freq;
   o.connect(g);
