@@ -119,6 +119,7 @@ let target = 0;
 let heading = 0;
 let useNorth = true;
 let lastBeep = 0;
+let displayAngle = 0;
 
 function initAudio(){
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -147,8 +148,12 @@ function handleOrientation(event){
 
   if(!heading) return;
 
-  document.getElementById("arrow")
-    .style.transform = `translateX(-50%) rotate(${heading}deg)`;
+let diffAngle = heading - displayAngle;
+diffAngle = (diffAngle + 540) % 360 - 180;
+displayAngle += diffAngle;
+
+document.getElementById("arrow")
+  .style.transform = `translateX(-50%) rotate(${displayAngle}deg)`;
 
   // 基準マーカー表示
   document.getElementById("marker")
