@@ -1,246 +1,98 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sound Compass</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smooth Bonfire Hypnosis</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
 
-<style>
-body{
-  margin:0;
-  background:#0f1117;
-  color:white;
-  font-family:system-ui;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  height:100vh;
-}
+        #fire-light {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #ff8c00 0%, #ff4500 40%, #8b0000 80%, #000 100%);
+            animation: colorShift 10s infinite alternate ease-in-out;
+            
+            /* --- 修正ポイント：ここから --- */
+            /* 0.2秒かけて変化を繋ぐ。ease-outで変化の終わりをよりソフトに */
+            transition: opacity 0.2s ease-out; 
+            will-change: opacity; 
+            /* --- 修正ポイント：ここまで --- */
+        }
 
-h1{
-  font-weight:300;
-  letter-spacing:2px;
-  margin-bottom:10px;
-}
+        #noise-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAAV0lEQVRoQ+3BQREAAAgCQMC/bAsXCOwI6VfX4zX3Xo7Hw+FwOBwOh8PhcDgcDofD4XA4HA6Hw+FwOBwOh8PhcDgcDofD4XA4HA6Hw+FwOBwOh8PhcDj8HRwO+w4L8h4LggAAAABJRU5ErkJggg==");
+            background-repeat: repeat;
+            opacity: 0.1; /* チラつきを抑えるため少し薄くしました */
+            pointer-events: none;
+        }
 
-.compass{
-  width:260px;
-  height:260px;
-  border-radius:50%;
-  border:2px solid rgba(255,255,255,0.1);
-  position:relative;
-  backdrop-filter:blur(8px);
-  box-shadow:0 0 40px rgba(0,255,255,0.08);
-}
+        @keyframes colorShift {
+            0% { filter: hue-rotate(0deg) saturate(1); }
+            100% { filter: hue-rotate(15deg) saturate(1.2); }
+        }
 
-.cardinal{
-  position:absolute;
-  font-size:14px;
-  font-weight:600;
-  opacity:0.8;
-}
-
-.n{ top:8px; left:50%; transform:translateX(-50%); }
-.s{ bottom:8px; left:50%; transform:translateX(-50%); }
-.e{ right:8px; top:50%; transform:translateY(-50%); }
-.w{ left:8px; top:50%; transform:translateY(-50%); }
-
-.arrow{
-  width:4px;
-  height:110px;
-  background:linear-gradient(to top, cyan, white);
-  position:absolute;
-  bottom:50%;
-  left:50%;
-  transform-origin:50% 100%;
-  transform:translateX(-50%) rotate(0deg);
-  transition: transform 0.1s linear;
-  border-radius:2px;
-}
-
-.marker{
-  width:6px;
-  height:110px;
-  background:linear-gradient(to top, red, transparent);
-  position:absolute;
-  bottom:50%;
-  left:50%;
-  transform-origin:50% 100%;
-  transform:translateX(-50%) rotate(0deg);
-  transition: transform 0.2s ease;
-  opacity:0.8;
-}
-
-.info{
-  margin-top:20px;
-  font-size:14px;
-  opacity:0.7;
-  text-align:center;
-}
-
-button{
-  margin-top:15px;
-  padding:10px 18px;
-  border:none;
-  border-radius:20px;
-  background:linear-gradient(45deg,cyan,#6a5cff);
-  color:white;
-  font-size:14px;
-}
-</style>
+        #ui {
+            position: relative;
+            color: rgba(255, 255, 255, 0.4);
+            font-family: 'Courier New', Courier, monospace;
+            text-align: center;
+            pointer-events: none;
+        }
+    </style>
 </head>
 <body>
 
-<h1>SOUND COMPASS</h1>
+    <div id="fire-light"></div>
+    <div id="noise-overlay"></div>
 
-<div class="compass">
-  <div class="cardinal n">N</div>
-  <div class="cardinal e">E</div>
-  <div class="cardinal s">S</div>
-  <div class="cardinal w">W</div>
+    <div id="ui">
+        <h1>BONFIRE HYPNOSIS</h1>
+        <p>Gaze into the light...</p>
+    </div>
 
-  <div class="marker" id="marker"></div>
-  <div class="arrow" id="arrow"></div>
-</div>
+    <script>
+        const fireLight = document.getElementById('fire-light');
 
-<div class="info" id="info">待機中...</div>
+        function flicker() {
+            // 明るさの落差を小さく調整 (0.8 〜 1.0の間)
+            const baseOpacity = 0.8;
+            const randomVariance = Math.random() * 0.2;
+            const newOpacity = baseOpacity + randomVariance;
 
-<button id="startBtn">開始</button>
-<button id="modeBtn" style="display:none;">基準: 北</button>
+            fireLight.style.opacity = newOpacity;
 
-<script>
+            // 次の変化までの時間を少し伸ばして、transitionが効く余白を作る
+            // (150ms 〜 300ms)
+            const nextFlicker = 150 + (Math.random() * 150);
+            
+            setTimeout(flicker, nextFlicker);
+        }
 
-let audioCtx;
-let osc;
-let gainNode;
+        flicker();
 
-let target = 0;
-let heading = 0;
-let useNorth = true;
-let lastBeep = 0;
-let displayAngle = 0;
-
-function initAudio(){
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  osc = audioCtx.createOscillator();
-  gainNode = audioCtx.createGain();
-  osc.type = "sine";
-  osc.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
-  gainNode.gain.value = 0;
-  osc.start();
-}
-
-function getDiff(target,current){
-  let diff = target - current;
-  diff = (diff + 540) % 360 - 180;
-  return diff;
-}
-function normalize(angle){
-  return ((angle % 360) + 360) % 360;
-}
-function handleOrientation(event){
-
-  if(event.webkitCompassHeading !== undefined){
-    heading = event.webkitCompassHeading;
-  }else{
-    heading = 360 - event.alpha;
-  }
-
-  if(!heading) return;
- heading = normalize(heading);
-let diffAngle = heading - displayAngle;
-diffAngle = (diffAngle + 540) % 360 - 180;
-displayAngle += diffAngle;
-
-document.getElementById("arrow")
-  .style.transform = `translateX(-50%) rotate(${displayAngle}deg)`;
-
-  // 基準マーカー表示
-  document.getElementById("marker")
-    .style.transform = `translateX(-50%) rotate(${target}deg)`;
-
-  const diff = getDiff(target, heading);
-  const absDiff = Math.abs(diff);
-
-  document.getElementById("info").textContent =
-    `現在:${Math.round(heading)}°  基準:${Math.round(normalize(target))}°  ズレ:${Math.round(diff === 180 ? -180 : diff)}°`;
-
-  if(absDiff <= 5){
-    osc.frequency.value = 1200;
-    gainNode.gain.value = 0.25;
-  }
-  else if(absDiff >= 175){
-    osc.frequency.value = 200;
-    gainNode.gain.value = 0.25;
-  }
-  else{
-    gainNode.gain.value = 0;
-    const now = Date.now();
-
-    if(absDiff < 45){
-      if(now - lastBeep > 120){
-        beep(absDiff);
-        lastBeep = now;
-      }
-    }else{
-      if(now - lastBeep > 400){
-        beep(absDiff);
-        lastBeep = now;
-      }
-    }
-  }
-}
-
-
-function beep(absDiff){
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-
-  const freq = 400 + (1 - Math.min(absDiff,180)/180)*600;
-
-  o.frequency.value = freq;
-  o.connect(g);
-  g.connect(audioCtx.destination);
-
-  g.gain.value = 0.3;
-  o.start();
-  o.stop(audioCtx.currentTime + 0.1);
-}
-
-document.getElementById("startBtn")
-.addEventListener("click", async()=>{
-
-  if(typeof DeviceOrientationEvent.requestPermission === "function"){
-    const permission = await DeviceOrientationEvent.requestPermission();
-    if(permission !== "granted"){
-      alert("許可が必要です");
-      return;
-    }
-  }
-
-  initAudio();
-  window.addEventListener("deviceorientation",handleOrientation);
-
-  document.getElementById("startBtn").style.display="none";
-  document.getElementById("modeBtn").style.display="inline-block";
-});
-
-document.getElementById("modeBtn")
-.addEventListener("click",()=>{
-
-if(useNorth){
-  target = normalize(heading);
-  useNorth = false;
-  document.getElementById("modeBtn").textContent="基準: 現在方向";
-}else{
-  target = 0;
-  useNorth = true;
-  document.getElementById("modeBtn").textContent="基準: 北";
-}
-});
-</script>
-
+        document.body.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        });
+    </script>
 </body>
 </html>
