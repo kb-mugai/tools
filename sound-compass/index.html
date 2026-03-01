@@ -8,7 +8,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sound Compass</title>
-<meta name="description" content="物理コンパス挙動＋音誘導＋水平バブル搭載。">
+<meta name="description" content="物理コンパス＋音誘導＋水平バブル＋十字線表示。">
 <link rel="stylesheet" href="../common.css">
 
 <style>
@@ -75,6 +75,23 @@ h1{
   opacity:0.8;
 }
 
+/* 中央固定十字線 */
+.cross{
+  position:absolute;
+  width:60px;
+  height:60px;
+  pointer-events:none;
+}
+.cross::before, .cross::after{
+  content:"";
+  position:absolute;
+  background:white;
+}
+.cross::before{ /* 水平線 */
+  top:50%; left:0; width:100%; height:1px; transform:translateY(-50%);}
+.cross::after{ /* 垂直線 */
+  left:50%; top:0; width:1px; height:100%; transform:translateX(-50%);}
+
 /* 水平バブル（針より下レイヤー） */
 .bubble{
   width:18px;
@@ -87,6 +104,20 @@ h1{
   transform:translate(-50%,-50%);
   opacity:0.9;
   pointer-events:none;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+/* バブル内十字線 */
+.bubble::before, .bubble::after{
+  content:"";
+  position:absolute;
+  background:white;
+}
+.bubble::before{
+  width:10px; height:1px; top:50%; left:50%; transform:translate(-50%,-50%);}
+.bubble::after{
+  width:1px; height:10px; top:50%; left:50%; transform:translate(-50%,-50%);
 }
 
 .arrow{
@@ -102,7 +133,7 @@ h1{
 }
 
 .info{
-  margin-top:20px;
+  margin-top:15px;
   font-size:14px;
   opacity:0.7;
   text-align:center;
@@ -122,7 +153,7 @@ button{
 
 <body>
 
-<h1>SOUND COMPASS ver1.2.0</h1>
+<h1>SOUND COMPASS ver1.3.0</h1>
 
 <div class="compass">
   <div class="dial" id="dial">
@@ -134,6 +165,7 @@ button{
   </div>
 
   <div class="bubble" id="bubble"></div>
+  <div class="cross"></div>
   <div class="arrow"></div>
 </div>
 
@@ -155,7 +187,6 @@ let useNorth = true;
 let lastBeep = 0;
 let soundEnabled = true;
 
-// 水平用
 let smoothX = 0;
 let smoothY = 0;
 
@@ -189,7 +220,6 @@ function handleOrientation(event){
   }
 
   if(heading == null) return;
-
   heading = normalize(heading);
 
   // ---- スムーズ回転 ----
@@ -207,7 +237,7 @@ function handleOrientation(event){
   const absDiff = Math.abs(diff);
 
   document.getElementById("info").textContent =
-    `現在:${Math.round(heading)}°  ズレ:${Math.round(diff)}°`;
+    `現在:${Math.round(heading)}°  基準:${Math.round(normalize(target))}°  ズレ:${Math.round(diff)}°`;
 
   // ---- 水平バブル ----
   const rawX = event.gamma || 0;
@@ -217,7 +247,6 @@ function handleOrientation(event){
   const moveX = Math.max(-limit, Math.min(limit, rawX));
   const moveY = Math.max(-limit, Math.min(limit, rawY));
 
-  // ローパスフィルタ
   smoothX = smoothX * 0.85 + moveX * 0.15;
   smoothY = smoothY * 0.85 + moveY * 0.15;
 
@@ -295,7 +324,6 @@ document.getElementById("modeBtn")
 
 document.getElementById("soundBtn")
 .addEventListener("click", async()=>{
-
   soundEnabled = !soundEnabled;
 
   if(!soundEnabled && gainNode){
