@@ -1,14 +1,18 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Sound Compass Pro v1.7.0</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js"></script>
+<title>Sound Compass|音コンパス</title>
+<meta name="description" content="音で方向を示してくれるコンパスです。北基準モード、相対モード。登録不要・無料で使えます。">
+<link rel="stylesheet" href="../common.css">
 <style>
 /* スタイルは変更なし */
 body{ margin:0; background:#0f1117; color:white; font-family: system-ui; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow: hidden; touch-action: none; }
-h1{ font-weight:300; letter-spacing:2px; margin-bottom:10px; font-size: 0.8rem; opacity: 0.3; }
 .compass{ width:280px; height:280px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); position:relative; display:flex; align-items:center; justify-content:center; }
 .dial{ width:100%; height:100%; position:absolute; }
 .tick { position: absolute; width: 2px; height: 10px; background: rgba(255,255,255,0.2); top: 5px; left: calc(50% - 1px); transform-origin: 1px 135px; }
@@ -32,11 +36,15 @@ h1{ font-weight:300; letter-spacing:2px; margin-bottom:10px; font-size: 0.8rem; 
 .controls { margin-top: 30px; }
 button{ padding:12px 24px; border-radius:25px; background:rgba(255,255,255,0.05); color:white; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 #startBtn { background:linear-gradient(45deg,#00d2ff,#6a5cff); border:none; padding: 15px 40px; }
+.nav-wrapper { max-width: 300px; margin: 0 auto 10px; text-align: left; padding: 0 25px; box-sizing: border-box; }
 </style>
 </head>
 <body>
-
-<h1>SOUND COMPASS v1.7.0</h1>
+<div class="nav-wrapper">
+  <a href="../" class="back-button">← トップページに戻る</a>
+</div>
+<h1>SOUND COMPASS ver1.1.0</h1>
+<p>音で方位を示すコンパスです。北基準と相対基準（現在角度指定）モードを切替できます。</p>
 <div class="compass">
   <div class="dial" id="dial"><div class="target-marker" id="targetMarker"></div></div>
   <div class="bubble" id="bubble"></div>
@@ -58,8 +66,8 @@ button{ padding:12px 24px; border-radius:25px; background:rgba(255,255,255,0.05)
 let audioCtx, osc, gainNode;
 let heading = 0, displayHeading = 0, target = 0;
 let useNorth = true, lastBeep = 0, soundEnabled = true;
-let smoothX = 0, smoothY = 0;
-const noSleep = new NoSleep();
+let rawX = 0, rawY = 0, smoothX = 0, smoothY = 0;
+let wakeLock = null;
 
 // 目盛り生成
 const dial = document.getElementById('dial');
@@ -75,25 +83,36 @@ for (let i = 0; i < 360; i += 15) {
         if(i === 0) span.classList.add('north');
         span.textContent = mainPoints[i];
         const angleRad = (i - 90) * (Math.PI / 180);
-        const x = 140 + 105 * Math.cos(angleRad);
-        const y = 140 + 105 * Math.sin(angleRad);
-        span.style.left = `${x}px`; span.style.top = `${y}px`;
+        const xPos = 140 + 105 * Math.cos(angleRad);
+        const yPos = 140 + 105 * Math.sin(angleRad);
+        span.style.left = `${xPos}px`; span.style.top = `${yPos}px`;
         span.style.transform = `translate(-50%, -50%) rotate(${i}deg)`;
         dial.appendChild(span);
     }
 }
 
-async function resumeAudio() {
-  if (audioCtx && audioCtx.state === 'suspended') {
-    await audioCtx.resume();
-    console.log("Audio resumed");
+// スクリーン常時点灯のリクエスト（Wake Lock API）
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('Wake Lock is active');
+    }
+  } catch (err) {
+    console.error(`${err.name}, ${err.message}`);
   }
 }
 
-// 復帰時の自動リトライロジック
-document.addEventListener('visibilitychange', () => {
+async function resumeAudio() {
+  if (audioCtx && audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+  }
+}
+
+document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState === 'visible') {
     resumeAudio();
+    requestWakeLock(); // 復帰時に再リクエスト
   }
 });
 
@@ -109,60 +128,33 @@ function initAudio(){
 }
 
 function handleOrientation(event){
-  // スリープから戻った時に状態を確認
-  if (audioCtx && audioCtx.state === 'suspended' && soundEnabled) {
-      audioCtx.resume();
-  }
+  if (audioCtx && audioCtx.state === 'suspended' && soundEnabled) audioCtx.resume();
 
-  let rawHeading = event.webkitCompassHeading || (360 - event.alpha);
-  if(rawHeading == null) return;
-  heading = Math.round(rawHeading) % 360;
-
-  let diffAngle = (heading - displayHeading + 540) % 360 - 180;
-  displayHeading += diffAngle * 0.2;
-  document.getElementById("dial").style.transform = `rotate(${-displayHeading}deg)`;
-  
-  const diff = (target - heading + 540) % 360 - 180;
-  const absDiff = Math.abs(Math.round(diff));
-
-  document.getElementById("currentVal").textContent = `${heading}°`;
-  document.getElementById("targetVal").textContent = `${Math.round(target) % 360}°`;
-  document.getElementById("diffVal").textContent = `${diff > 0 ? '+' : ''}${Math.round(diff)}°`;
-
-  const marker = document.getElementById("targetMarker");
-  marker.style.display = useNorth ? "none" : "block";
-  marker.style.transform = `rotate(${target}deg)`;
+  let h = event.webkitCompassHeading || (360 - event.alpha);
+  if(h != null) heading = Math.round(h) % 360;
 
   let x = event.gamma || 0;
   let y = event.beta || 0;
   if (y > 90) y = 180 - y;
   if (y < -90) y = -180 - y;
   if (Math.abs(event.beta) > 90) x = -x;
+  rawX = x; rawY = y;
 
-  const limit = 60;
-  smoothX = smoothX * 0.8 + Math.max(-limit, Math.min(limit, x)) * 0.2;
-  smoothY = smoothY * 0.8 + Math.max(-limit, Math.min(limit, y)) * 0.2;
+  processSound();
+}
 
-  const bubbleEl = document.getElementById("bubble");
-  bubbleEl.style.transform = `translate(calc(-50% + ${smoothX}px), calc(-50% + ${smoothY}px))`;
-  
-  if(Math.abs(x) < 2.5 && Math.abs(y) < 2.5) {
-      bubbleEl.classList.add('centered');
-  } else {
-      bubbleEl.classList.remove('centered');
-  }
-
+function processSound() {
   if(!soundEnabled || !audioCtx || audioCtx.state !== 'running') return;
+  const diff = (target - heading + 540) % 360 - 180;
+  const absDiff = Math.abs(Math.round(diff));
 
   if(absDiff <= 5){
     osc.frequency.setTargetAtTime(1000, audioCtx.currentTime, 0.03);
     gainNode.gain.setTargetAtTime(0.3, audioCtx.currentTime, 0.03);
-  } 
-  else if(absDiff >= 175){
+  } else if(absDiff >= 175){
     osc.frequency.setTargetAtTime(200, audioCtx.currentTime, 0.03);
     gainNode.gain.setTargetAtTime(0.3, audioCtx.currentTime, 0.03);
-  }
-  else {
+  } else {
     gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.03);
     const now = Date.now();
     if(now - lastBeep > (120 + absDiff * 4.5)){ 
@@ -187,24 +179,47 @@ function beep(absDiff){
   o.stop(audioCtx.currentTime + 0.12);
 }
 
+function updateVisuals() {
+  let diffAngle = (heading - displayHeading + 540) % 360 - 180;
+  displayHeading += diffAngle * 0.2;
+  document.getElementById("dial").style.transform = `rotate(${-displayHeading}deg)`;
+  
+  const diff = (target - heading + 540) % 360 - 180;
+  document.getElementById("currentVal").textContent = `${heading}°`;
+  document.getElementById("targetVal").textContent = `${Math.round(target) % 360}°`;
+  document.getElementById("diffVal").textContent = `${diff > 0 ? '+' : ''}${Math.round(diff)}°`;
+
+  const marker = document.getElementById("targetMarker");
+  marker.style.display = useNorth ? "none" : "block";
+  marker.style.transform = `rotate(${target}deg)`;
+
+  const limit = 60;
+  smoothX = smoothX * 0.8 + Math.max(-limit, Math.min(limit, rawX)) * 0.2;
+  smoothY = smoothY * 0.8 + Math.max(-limit, Math.min(limit, rawY)) * 0.2;
+
+  const bubbleEl = document.getElementById("bubble");
+  bubbleEl.style.transform = `translate(calc(-50% + ${smoothX}px), calc(-50% + ${smoothY}px))`;
+  bubbleEl.className = (Math.abs(rawX) < 2.5 && Math.abs(rawY) < 2.5) ? 'bubble centered' : 'bubble';
+
+  requestAnimationFrame(updateVisuals);
+}
+
 document.getElementById("startBtn").addEventListener("click", async()=>{
   if(typeof DeviceOrientationEvent.requestPermission === "function"){
     const permission = await DeviceOrientationEvent.requestPermission();
     if(permission !== "granted") return;
   }
-  
-  // スリープ防止を有効化
-  noSleep.enable();
-  
+  requestWakeLock(); // 常時点灯開始
   initAudio();
   window.addEventListener("deviceorientation", handleOrientation);
+  updateVisuals();
   document.getElementById("startBtn").style.display="none";
   document.getElementById("modeBtn").style.display="inline-block";
   document.getElementById("soundBtn").style.display="inline-block";
 });
 
 document.getElementById("modeBtn").addEventListener("click",()=>{
-  resumeAudio(); // ボタン操作のついでに復帰
+  resumeAudio();
   useNorth = !useNorth;
   target = useNorth ? 0 : heading;
   document.getElementById("modeBtn").textContent = useNorth ? "北基準" : "相対基準";
@@ -213,13 +228,11 @@ document.getElementById("modeBtn").addEventListener("click",()=>{
 
 document.getElementById("soundBtn").addEventListener("click", async ()=>{
   soundEnabled = !soundEnabled;
-  if(soundEnabled) {
-    await resumeAudio();
-  } else if(gainNode) {
-    gainNode.gain.value = 0;
-  }
+  if(soundEnabled) await resumeAudio();
+  else if(gainNode) gainNode.gain.value = 0;
   document.getElementById("soundBtn").textContent = soundEnabled ? "音: ON" : "音: OFF";
 });
 </script>
+<script data-goatcounter="https://kb-mugai.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
