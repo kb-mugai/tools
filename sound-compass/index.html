@@ -7,8 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sound Compass|音コンパス</title>
-<meta name="description" content="音で方向を示してくれるリアル挙動コンパス。北基準と現在方角基準モード切替対応。登録不要・無料。">
+<title>Sound Compass</title>
+<meta name="description" content="物理コンパス挙動＋音誘導＋水平バブル搭載。">
 <link rel="stylesheet" href="../common.css">
 
 <style>
@@ -41,6 +41,7 @@ h1{
   display:flex;
   align-items:center;
   justify-content:center;
+  overflow:hidden;
 }
 
 .dial{
@@ -48,7 +49,7 @@ h1{
   height:100%;
   position:absolute;
   border-radius:50%;
-  transition: transform 0.1s linear;
+  transition: transform 0.08s linear;
 }
 
 .cardinal{
@@ -74,6 +75,20 @@ h1{
   opacity:0.8;
 }
 
+/* 水平バブル（針より下レイヤー） */
+.bubble{
+  width:18px;
+  height:18px;
+  border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, #aef, cyan);
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  opacity:0.9;
+  pointer-events:none;
+}
+
 .arrow{
   width:4px;
   height:110px;
@@ -83,6 +98,7 @@ h1{
   left:50%;
   transform:translateX(-50%);
   border-radius:2px;
+  z-index:5;
 }
 
 .info{
@@ -101,25 +117,12 @@ button{
   color:white;
   font-size:14px;
 }
-
-.nav-wrapper {
-  max-width: 300px;
-  margin: 0 auto 10px;
-  text-align: left;
-  padding: 0 25px;
-  box-sizing: border-box;
-}
 </style>
 </head>
 
 <body>
 
-<div class="nav-wrapper">
-  <a href="../" class="back-button">← トップページに戻る</a>
-</div>
-
-<h1>SOUND COMPASS ver1.1.0</h1>
-<p>物理コンパス挙動＋音誘導。北基準／現在方向基準対応。</p>
+<h1>SOUND COMPASS ver1.2.0</h1>
 
 <div class="compass">
   <div class="dial" id="dial">
@@ -129,6 +132,8 @@ button{
     <div class="cardinal w">W</div>
     <div class="marker" id="marker"></div>
   </div>
+
+  <div class="bubble" id="bubble"></div>
   <div class="arrow"></div>
 </div>
 
@@ -144,10 +149,15 @@ let osc;
 let gainNode;
 
 let heading = 0;
+let displayHeading = 0;
 let target = 0;
 let useNorth = true;
 let lastBeep = 0;
 let soundEnabled = true;
+
+// 水平用
+let smoothX = 0;
+let smoothY = 0;
 
 function initAudio(){
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -182,11 +192,14 @@ function handleOrientation(event){
 
   heading = normalize(heading);
 
-  // ★ 物理コンパス挙動：文字盤を逆回転
-  document.getElementById("dial")
-    .style.transform = `rotate(${-heading}deg)`;
+  // ---- スムーズ回転 ----
+  let diffAngle = heading - displayHeading;
+  diffAngle = (diffAngle + 540) % 360 - 180;
+  displayHeading += diffAngle * 0.2;
 
-  // ★ 基準マーカー（world基準）
+  document.getElementById("dial")
+    .style.transform = `rotate(${-displayHeading}deg)`;
+
   document.getElementById("marker")
     .style.transform = `translateX(-50%) rotate(${target}deg)`;
 
@@ -194,8 +207,24 @@ function handleOrientation(event){
   const absDiff = Math.abs(diff);
 
   document.getElementById("info").textContent =
-    `現在:${Math.round(heading)}°  基準:${Math.round(normalize(target))}°  ズレ:${Math.round(diff === 180 ? -180 : diff)}°`;
+    `現在:${Math.round(heading)}°  ズレ:${Math.round(diff)}°`;
 
+  // ---- 水平バブル ----
+  const rawX = event.gamma || 0;
+  const rawY = event.beta || 0;
+
+  const limit = 35;
+  const moveX = Math.max(-limit, Math.min(limit, rawX));
+  const moveY = Math.max(-limit, Math.min(limit, rawY));
+
+  // ローパスフィルタ
+  smoothX = smoothX * 0.85 + moveX * 0.15;
+  smoothY = smoothY * 0.85 + moveY * 0.15;
+
+  document.getElementById("bubble").style.transform =
+    `translate(calc(-50% + ${smoothX}px), calc(-50% + ${smoothY}px))`;
+
+  // ---- 音 ----
   if(!soundEnabled || !audioCtx) return;
 
   if(absDiff <= 5){
@@ -209,17 +238,9 @@ function handleOrientation(event){
   else{
     gainNode.gain.value = 0;
     const now = Date.now();
-
-    if(absDiff < 45){
-      if(now - lastBeep > 120){
-        beep(absDiff);
-        lastBeep = now;
-      }
-    }else{
-      if(now - lastBeep > 400){
-        beep(absDiff);
-        lastBeep = now;
-      }
+    if(now - lastBeep > 250){
+      beep(absDiff);
+      lastBeep = now;
     }
   }
 }
@@ -261,7 +282,6 @@ document.getElementById("startBtn")
 
 document.getElementById("modeBtn")
 .addEventListener("click",()=>{
-
   if(useNorth){
     target = normalize(heading);
     useNorth = false;
@@ -290,9 +310,6 @@ document.getElementById("soundBtn")
     soundEnabled ? "音: ON" : "音: OFF";
 });
 </script>
-
-<script data-goatcounter="https://kb-mugai.goatcounter.com/count"
-async src="//gc.zgo.at/count.js"></script>
 
 </body>
 </html>

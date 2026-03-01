@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -111,11 +112,11 @@ input[type="number"] { appearance: textfield; }
     <div class="container">
     <a href="../"class="back-button">← トップページに戻る</a>
 
-<h1>QRコードメーカー ver.1.0.0</h1>
+<h1>QRコードメーカー ver.1.0.1</h1>
 <p>ロゴ挿入とグラデーション方向を選べるQRコードメーカー</p>
 <p>画像はブラウザ上で処理されるため、外部サーバーに送信される事はありません</p>
 <p>テキストやURLを入力してください</p>
-<input type="text" id="text-input" placeholder="ここに入力">
+<input type="text" id="text-input" placeholder="半角英数記号のみ入力できます" >
 
 <!-- 色指定・カラーピッカー -->
 <div class="row">
@@ -173,6 +174,17 @@ const qrDiv = document.getElementById("qrcode");
 let logoFile = null;
 let angle = 45;
 
+// textInput のイベントリスナーに追加
+textInput.addEventListener("input", (e) => {
+    // 半角英数・記号以外を空文字に置換
+    const filtered = e.target.value.replace(/[^\x21-\x7e\s]/g, "");
+    if (e.target.value !== filtered) {
+        e.target.value = filtered;
+        // ここで「半角のみ入力可能です」とアラートを出しても親切
+    }
+    updateQRCode();
+});
+
 // QR Code オブジェクト
 let qrCode = new QRCodeStyling({
     width: 512,
@@ -184,21 +196,19 @@ let qrCode = new QRCodeStyling({
 });
 qrCode.append(qrDiv);
 
-// 1. 安定する8方向角度を配列に用意
- const directions = [45, 52, 90, 135, 180, 256, 326, 0]; // 左上→上→右上→右→右下→下→左下→左、角度は見た目と数値一致してない
-let currentIndex = 0; // 初期は左上
+// 1. 45度刻みの綺麗な8方向（度数法で管理）
+const directions = [0, 45, 90, 135, 180, 225, 270, 315]; 
+let currentIndex = 0; // 0度（右方向）からスタート
 
-// 2. +ボタン
+// 2. +ボタン（時計回り）
 anglePlus.addEventListener("click", () => {
     currentIndex = (currentIndex + 1) % directions.length;
-    angle = directions[currentIndex];
     updateQRCode();
 });
 
-// 3. -ボタン
+// 3. -ボタン（反時計回り）
 angleMinus.addEventListener("click", () => {
     currentIndex = (currentIndex - 1 + directions.length) % directions.length;
-    angle = directions[currentIndex];
     updateQRCode();
 });
 
@@ -289,6 +299,8 @@ let options = {
 
 
 function renderQR(options){
+    const degreesToRadians = (deg) => deg * (Math.PI / 180);
+
     if(colorMode.value === "single"){
         options.dotsOptions = { type: "square", color: color1.value, gradient: undefined };
     } else if(colorMode.value === "linear-gradient"){
@@ -296,7 +308,7 @@ function renderQR(options){
             type: "square",
             gradient: { 
                 type: "linear", 
-                rotation: angle, 
+                rotation: degreesToRadians(directions[currentIndex]), 
                 colorStops: [
                     { offset:0, color: color1.value },
                     { offset:1, color: color2.value }
@@ -304,6 +316,7 @@ function renderQR(options){
             }
         };
     } else if(colorMode.value === "radial-gradient"){
+        // 放射状グラデーションを復活
         options.dotsOptions = {
             type: "square",
             gradient: {
@@ -318,7 +331,6 @@ function renderQR(options){
 
     qrCode.update(options);
 }
-
 // 保存ボタン
 savePcBtn.addEventListener("click", () => {
     qrCode.update({ width: 512, height: 512 });
