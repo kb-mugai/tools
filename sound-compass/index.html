@@ -12,7 +12,30 @@
 <link rel="stylesheet" href="../common.css">
 <style>
 /* スタイルは変更なし */
-body{ margin:0; background:#0f1117; color:white; font-family: system-ui; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow: hidden; touch-action: none; }
+body {
+  margin: 0;
+  background: #0f1117;
+  color: white;
+  font-family: system-ui;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* 変更点：最低の高さを100dvhにし、はみ出したらスクロール許可 */
+  min-height: 100dvh; 
+  overflow-y: auto; 
+  overflow-x: hidden;
+  /* iOSでのスクロールを滑らかにする */
+  -webkit-overflow-scrolling: touch; 
+  
+  /* 下部の余白（ツールバー回避用） */
+  padding-bottom: 60px; 
+  padding-bottom: calc(env(safe-area-inset-bottom) + 40px);
+  box-sizing: border-box;
+}
+html {
+  background: #0f1117;
+}
 .compass{ width:280px; height:280px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); position:relative; display:flex; align-items:center; justify-content:center; }
 .dial{ width:100%; height:100%; position:absolute; }
 .tick { position: absolute; width: 2px; height: 10px; background: rgba(255,255,255,0.2); top: 5px; left: calc(50% - 1px); transform-origin: 1px 135px; }
@@ -33,7 +56,14 @@ body{ margin:0; background:#0f1117; color:white; font-family: system-ui; display
 .sub-val { font-size: 16px; font-weight: 300; }
 .main-display { display: flex; flex-direction: column; align-items: center; width: 100px; }
 .main-val { font-size: 42px; font-weight: bold; line-height: 1; font-variant-numeric: tabular-nums; }
-.controls { margin-top: 30px; }
+.controls {
+  margin-top: 40px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px; /* ボタン同士の間隔 */
+  align-items: center;
+}
 button{ padding:12px 24px; border-radius:25px; background:rgba(255,255,255,0.05); color:white; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 #startBtn { background:linear-gradient(45deg,#00d2ff,#6a5cff); border:none; padding: 15px 40px; }
 .nav-wrapper { max-width: 300px; margin: 0 auto 10px; text-align: left; padding: 0 25px; box-sizing: border-box; }
@@ -43,8 +73,10 @@ button{ padding:12px 24px; border-radius:25px; background:rgba(255,255,255,0.05)
 <div class="nav-wrapper">
   <a href="../" class="back-button">← トップページに戻る</a>
 </div>
+<br>
 <h1>SOUND COMPASS ver1.1.1</h1>
-<p>音で方位を示すコンパスです。北基準と相対基準（現在角度指定）モードを切替できます。</p>
+音で方位を示すコンパスです。北基準と相対基準（現在角度指定）モードを切替できます。
+<p>
 <div class="compass">
   <div class="dial" id="dial"><div class="target-marker" id="targetMarker"></div></div>
   <div class="bubble" id="bubble"></div>
