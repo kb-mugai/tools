@@ -2,113 +2,199 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>音コンパス</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sound Compass</title>
+
 <style>
-  body {
-    text-align: center;
-    font-family: sans-serif;
-    padding-top: 40px;
-  }
-  #degree {
-    font-size: 2em;
-    margin: 20px;
-  }
-  button {
-    font-size: 1.2em;
-    padding: 10px 20px;
-  }
+body{
+  margin:0;
+  background:#0f1117;
+  color:white;
+  font-family:system-ui;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+}
+
+h1{
+  font-weight:300;
+  letter-spacing:2px;
+  margin-bottom:10px;
+}
+
+.compass{
+  width:220px;
+  height:220px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,0.1);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  position:relative;
+  backdrop-filter:blur(8px);
+  box-shadow:0 0 40px rgba(0,255,255,0.08);
+}
+
+.arrow{
+  width:4px;
+  height:90px;
+  background:linear-gradient(to top, cyan, white);
+  position:absolute;
+  top:20px;
+  border-radius:2px;
+}
+
+.info{
+  margin-top:20px;
+  font-size:14px;
+  opacity:0.7;
+}
+
+button{
+  margin-top:20px;
+  padding:10px 18px;
+  border:none;
+  border-radius:20px;
+  background:linear-gradient(45deg,cyan,#6a5cff);
+  color:white;
+  font-size:14px;
+}
 </style>
 </head>
 <body>
 
-<h1>音コンパス（最小版）</h1>
-<div id="degree">--°</div>
-<button id="startBtn">センサー許可</button>
+<h1>SOUND COMPASS</h1>
+
+<div class="compass">
+  <div class="arrow" id="arrow"></div>
+</div>
+
+<div class="info" id="info">
+待機中...
+</div>
+
+<button id="startBtn">開始</button>
+<button id="modeBtn" style="display:none;">基準: 北</button>
 
 <script>
+
 let audioCtx;
+let osc;
+let gainNode;
+
+let target = 0;
+let heading = 0;
+let useNorth = true;
 let lastBeep = 0;
-let target = 0; // 北固定（あとで基準モード追加可能）
 
-function initAudio() {
+function initAudio(){
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-}
-
-function playTone(freq, duration=0.1) {
-  if (!audioCtx) return;
-
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
+  osc = audioCtx.createOscillator();
+  gainNode = audioCtx.createGain();
   osc.type = "sine";
-  osc.frequency.value = freq;
-
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  gain.gain.value = 0.3;
-
+  osc.connect(gainNode);
+  gainNode.connect(audioCtx.destination);
+  gainNode.gain.value = 0;
   osc.start();
-  osc.stop(audioCtx.currentTime + duration);
 }
 
-function getDiff(target, current) {
+function getDiff(target,current){
   let diff = target - current;
   diff = (diff + 540) % 360 - 180;
   return diff;
 }
 
-function handleOrientation(event) {
-  let heading;
+function handleOrientation(event){
 
-  if (event.webkitCompassHeading !== undefined) {
+  if(event.webkitCompassHeading !== undefined){
     heading = event.webkitCompassHeading;
-  } else {
+  }else{
     heading = 360 - event.alpha;
   }
 
-  if (!heading) return;
+  if(!heading) return;
+
+  document.getElementById("arrow")
+    .style.transform = `rotate(${heading}deg)`;
 
   const diff = getDiff(target, heading);
   const absDiff = Math.abs(diff);
 
-  document.getElementById("degree").textContent =
-    Math.round(heading) + "° / diff: " + Math.round(diff);
+  document.getElementById("info").textContent =
+    `現在:${Math.round(heading)}°  ズレ:${Math.round(diff)}°`;
 
   const now = Date.now();
 
-  // 周波数をズレ量で変化（小さいほど高音）
-  const freq = 300 + (1 - Math.min(absDiff,180)/180) * 800;
+  if(absDiff <= 5){
+    // 完全一致 → 連続音
+    osc.frequency.value = 1200;
+    gainNode.gain.value = 0.25;
+  }
+  else{
+    gainNode.gain.value = 0;
 
-  if (absDiff < 10) {
-    // ほぼ合ってる → 連続音気味
-    if (now - lastBeep > 150) {
-      playTone(freq, 0.15);
-      lastBeep = now;
-    }
-  } else {
-    // ズレ大きい → ゆっくり
-    if (now - lastBeep > 400) {
-      playTone(freq, 0.1);
-      lastBeep = now;
+    if(absDiff < 45){
+      if(now - lastBeep > 120){
+        beep(absDiff);
+        lastBeep = now;
+      }
+    }else{
+      if(now - lastBeep > 400){
+        beep(absDiff);
+        lastBeep = now;
+      }
     }
   }
 }
 
-document.getElementById("startBtn").addEventListener("click", async () => {
+function beep(absDiff){
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = "sine";
 
-  if (typeof DeviceOrientationEvent.requestPermission === "function") {
+  const freq = 400 + (1 - Math.min(absDiff,180)/180)*600;
+  o.frequency.value = freq;
+
+  o.connect(g);
+  g.connect(audioCtx.destination);
+
+  g.gain.value = 0.3;
+  o.start();
+  o.stop(audioCtx.currentTime + 0.1);
+}
+
+document.getElementById("startBtn")
+.addEventListener("click", async()=>{
+
+  if(typeof DeviceOrientationEvent.requestPermission === "function"){
     const permission = await DeviceOrientationEvent.requestPermission();
-    if (permission !== "granted") {
+    if(permission !== "granted"){
       alert("許可が必要です");
       return;
     }
   }
 
   initAudio();
-  window.addEventListener("deviceorientation", handleOrientation);
-  document.getElementById("startBtn").style.display = "none";
+  window.addEventListener("deviceorientation",handleOrientation);
+
+  document.getElementById("startBtn").style.display="none";
+  document.getElementById("modeBtn").style.display="inline-block";
+});
+
+document.getElementById("modeBtn")
+.addEventListener("click",()=>{
+
+  if(useNorth){
+    target = heading;
+    useNorth = false;
+    document.getElementById("modeBtn").textContent="基準: 現在方向";
+  }else{
+    target = 0;
+    useNorth = true;
+    document.getElementById("modeBtn").textContent="基準: 北";
+  }
 });
 </script>
 
