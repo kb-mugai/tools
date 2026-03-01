@@ -7,8 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sound Compass|スマホ専用の音コンパス</title>
-<meta name="description" content="スマホ専用Webアプリ。音で方向を示してくれるコンパスです。北基準モードと現在方向基準モード。登録不要・無料で使えます。">
+<title>Sound Compass|音コンパス</title>
+<meta name="description" content="音で方向を示してくれるリアル挙動コンパス。北基準と現在方角基準モード切替対応。登録不要・無料。">
 <link rel="stylesheet" href="../common.css">
 
 <style>
@@ -38,6 +38,17 @@ h1{
   position:relative;
   backdrop-filter:blur(8px);
   box-shadow:0 0 40px rgba(0,255,255,0.08);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.dial{
+  width:100%;
+  height:100%;
+  position:absolute;
+  border-radius:50%;
+  transition: transform 0.1s linear;
 }
 
 .cardinal{
@@ -52,19 +63,6 @@ h1{
 .e{ right:8px; top:50%; transform:translateY(-50%); }
 .w{ left:8px; top:50%; transform:translateY(-50%); }
 
-.arrow{
-  width:4px;
-  height:110px;
-  background:linear-gradient(to top, cyan, white);
-  position:absolute;
-  bottom:50%;
-  left:50%;
-  transform-origin:50% 100%;
-  transform:translateX(-50%) rotate(0deg);
-  transition: transform 0.1s linear;
-  border-radius:2px;
-}
-
 .marker{
   width:6px;
   height:110px;
@@ -73,9 +71,18 @@ h1{
   bottom:50%;
   left:50%;
   transform-origin:50% 100%;
-  transform:translateX(-50%) rotate(0deg);
-  transition: transform 0.2s ease;
   opacity:0.8;
+}
+
+.arrow{
+  width:4px;
+  height:110px;
+  background:linear-gradient(to top, cyan, white);
+  position:absolute;
+  bottom:50%;
+  left:50%;
+  transform:translateX(-50%);
+  border-radius:2px;
 }
 
 .info{
@@ -111,16 +118,18 @@ button{
   <a href="../" class="back-button">← トップページに戻る</a>
 </div>
 
-<h1>SOUND COMPASS ver1.0.1</h1>
-<p>スマホ専用。音の鳴るコンパス。北基準と現在方角基準モードを切替できます。</p>
+<h1>SOUND COMPASS ver1.1.0</h1>
+<p>物理コンパス挙動＋音誘導。北基準／現在方向基準対応。</p>
 
 <div class="compass">
-  <div class="cardinal n">N</div>
-  <div class="cardinal e">E</div>
-  <div class="cardinal s">S</div>
-  <div class="cardinal w">W</div>
-  <div class="marker" id="marker"></div>
-  <div class="arrow" id="arrow"></div>
+  <div class="dial" id="dial">
+    <div class="cardinal n">N</div>
+    <div class="cardinal e">E</div>
+    <div class="cardinal s">S</div>
+    <div class="cardinal w">W</div>
+    <div class="marker" id="marker"></div>
+  </div>
+  <div class="arrow"></div>
 </div>
 
 <div class="info" id="info">待機中...</div>
@@ -134,11 +143,10 @@ let audioCtx;
 let osc;
 let gainNode;
 
-let target = 0;
 let heading = 0;
+let target = 0;
 let useNorth = true;
 let lastBeep = 0;
-let displayAngle = 0;
 let soundEnabled = true;
 
 function initAudio(){
@@ -174,13 +182,11 @@ function handleOrientation(event){
 
   heading = normalize(heading);
 
-  let diffAngle = heading - displayAngle;
-  diffAngle = (diffAngle + 540) % 360 - 180;
-  displayAngle += diffAngle;
+  // ★ 物理コンパス挙動：文字盤を逆回転
+  document.getElementById("dial")
+    .style.transform = `rotate(${-heading}deg)`;
 
-  document.getElementById("arrow")
-    .style.transform = `translateX(-50%) rotate(${displayAngle}deg)`;
-
+  // ★ 基準マーカー（world基準）
   document.getElementById("marker")
     .style.transform = `translateX(-50%) rotate(${target}deg)`;
 
