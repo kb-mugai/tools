@@ -1,125 +1,80 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音コンパス - Audio Compass</title>
-    <style>
-        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding-top: 50px; }
-        button { padding: 20px 40px; font-size: 1.2rem; margin: 10px; border-radius: 10px; border: none; cursor: pointer; }
-        .btn-start { background: #4CAF50; color: white; }
-        .btn-mode { background: #2196F3; color: white; }
-        #status { font-size: 3rem; margin: 20px; font-weight: bold; }
-        .info { color: #888; margin-top: 20px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音コンパス</title>
+<style>
+  body {
+    text-align: center;
+    font-family: sans-serif;
+    padding-top: 40px;
+  }
+  #degree {
+    font-size: 2em;
+    margin: 20px;
+  }
+  button {
+    font-size: 1.2em;
+    padding: 10px 20px;
+  }
+</style>
 </head>
 <body>
 
-    <h2>音コンパス</h2>
-    <div id="status">0°</div>
-    <p id="mode-text">現在のモード: 北基準</p>
-
-    <button class="btn-start" onclick="initAudio()">1. 音声開始</button><br>
-    <button class="btn-mode" onclick="toggleMode()">2. モード切替 / 基準設定</button>
-
-    <div class="info">
-        <p>※ iPhoneの場合は設定で「モーションと画面の向きのアクセス」を許可してください。</p>
-        <p>※ 音が出ない場合はマナーモードを解除してください。</p>
-    </div>
+<h1>音コンパス（最小版）</h1>
+<div id="degree">--°</div>
+<button id="startBtn">センサー許可</button>
 
 <script>
-    let audioCtx;
-    let oscillator;
-    let gainNode;
-    let isRelativeMode = false;
-    let targetHeading = 0;
-    let currentHeading = 0;
+let lastBeep = 0;
 
-    // 音声の初期化
-    function initAudio() {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            oscillator = audioCtx.createOscillator();
-            gainNode = audioCtx.createGain();
-            
-            oscillator.type = 'sine';
-            gainNode.gain.value = 0; // 最初は無音
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            oscillator.start();
-            
-            requestPermission();
-        }
+function beep() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.value = 800;
+  osc.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.1);
+}
+
+function handleOrientation(event) {
+  let heading;
+
+  if (event.webkitCompassHeading !== undefined) {
+    heading = event.webkitCompassHeading; // iPhone
+  } else {
+    heading = 360 - event.alpha; // Android
+  }
+
+  document.getElementById("degree").textContent = 
+    Math.round(heading) + "°";
+
+  // 北（0°付近）を向いたら音
+  if (heading < 10 || heading > 350) {
+    const now = Date.now();
+    if (now - lastBeep > 1000) {
+      beep();
+      lastBeep = now;
     }
+  }
+}
 
-    // センサーの許可リクエスト
-    function requestPermission() {
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-            DeviceOrientationEvent.requestPermission()
-                .then(response => {
-                    if (response === 'granted') {
-                        window.addEventListener('deviceorientation', updateHeading, true);
-                    }
-                });
-        } else {
-            window.addEventListener('deviceorientation', updateHeading, true);
-        }
+document.getElementById("startBtn").addEventListener("click", async () => {
+
+  if (typeof DeviceOrientationEvent.requestPermission === "function") {
+    const permission = await DeviceOrientationEvent.requestPermission();
+    if (permission !== "granted") {
+      alert("許可が必要です");
+      return;
     }
+  }
 
-    function toggleMode() {
-        isRelativeMode = !isRelativeMode;
-        if (isRelativeMode) {
-            targetHeading = currentHeading; // 今向いている方向を基準にする
-            document.getElementById('mode-text').innerText = "現在のモード: 相対基準 (セット完了)";
-        } else {
-            document.getElementById('mode-text').innerText = "現在のモード: 北基準";
-        }
-    }
-
-    function updateHeading(event) {
-        // compassHeadingは北を0とした度数
-        let heading = event.webkitCompassHeading || (360 - event.alpha);
-        currentHeading = Math.floor(heading);
-        document.getElementById('status').innerText = currentHeading + "°";
-
-        if (!audioCtx) return;
-
-        let diff;
-        if (isRelativeMode) {
-            // ターゲットとの差分 (-180〜180)
-            diff = (currentHeading - targetHeading + 540) % 360 - 180;
-            updateSoundRelative(diff);
-        } else {
-            // 北(0度)との差分
-            diff = (currentHeading + 180) % 360 - 180;
-            updateSoundNorth(diff);
-        }
-    }
-
-    // 北基準：北に近づくほど高音
-    function updateSoundNorth(diff) {
-        let absDiff = Math.abs(diff); // 0(北)〜180(南)
-        let freq = 880 - (absDiff * 3); // 北なら880Hz, 南なら340Hz
-        oscillator.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.1);
-        
-        // 北に近い時だけ音を大きく、遠いと小さくする
-        let volume = Math.max(0, 1 - (absDiff / 90)); 
-        gainNode.gain.setTargetAtTime(volume * 0.1, audioCtx.currentTime, 0.1);
-    }
-
-    // 相対基準：基準からズレるほど不協和音（デチューン）
-    function updateSoundRelative(diff) {
-        let absDiff = Math.abs(diff);
-        oscillator.frequency.setTargetAtTime(440, audioCtx.currentTime, 0.1);
-        
-        // ズレるほどピッチを細かく揺らす（うなりを発生させる）
-        oscillator.detune.setTargetAtTime(absDiff * 5, audioCtx.currentTime, 0.1);
-        
-        // ズレが小さいほど音が大きく、180度裏側だと消える
-        let volume = Math.max(0, 1 - (absDiff / 120));
-        gainNode.gain.setTargetAtTime(volume * 0.1, audioCtx.currentTime, 0.1);
-    }
+  window.addEventListener("deviceorientation", handleOrientation);
+  document.getElementById("startBtn").style.display = "none";
+});
 </script>
+
 </body>
 </html>
