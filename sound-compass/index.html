@@ -9,7 +9,7 @@ body{
   margin:0;
   background:#0f1117;
   color:white;
-  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Segoe UI', system-ui, sans-serif;
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -18,7 +18,7 @@ body{
   overflow: hidden;
 }
 
-h1{ font-weight:300; letter-spacing:2px; margin-bottom:10px; font-size: 1rem; opacity: 0.5; }
+h1{ font-weight:300; letter-spacing:2px; margin-bottom:10px; font-size: 0.9rem; opacity: 0.4; }
 
 .compass{
   width:280px;
@@ -26,8 +26,6 @@ h1{ font-weight:300; letter-spacing:2px; margin-bottom:10px; font-size: 1rem; op
   border-radius:50%;
   border:2px solid rgba(255,255,255,0.1);
   position:relative;
-  backdrop-filter:blur(8px);
-  box-shadow:0 0 40px rgba(0,255,255,0.1);
   display:flex;
   align-items:center;
   justify-content:center;
@@ -37,16 +35,7 @@ h1{ font-weight:300; letter-spacing:2px; margin-bottom:10px; font-size: 1rem; op
   width:100%;
   height:100%;
   position:absolute;
-  border-radius:50%;
 }
-
-.cardinal {
-  position:absolute;
-  font-size:18px;
-  font-weight:bold;
-  color: rgba(255,255,255,0.9);
-}
-.cardinal.north { color: #ff3d00; }
 
 .tick {
   position: absolute;
@@ -57,17 +46,19 @@ h1{ font-weight:300; letter-spacing:2px; margin-bottom:10px; font-size: 1rem; op
   left: calc(50% - 1px);
   transform-origin: 1px 135px;
 }
-.tick.large { 
-  height: 18px; 
-  width: 3px;
-  background: rgba(255,255,255,0.6); 
-}
+.tick.large { height: 18px; width: 3px; background: rgba(255,255,255,0.6); }
 
-/* ターゲットマーカー（赤い三角形のガイド） */
+.cardinal {
+  position:absolute;
+  font-size:18px;
+  font-weight:bold;
+  color: rgba(255,255,255,0.9);
+}
+.cardinal.north { color: #ff3d00; }
+
 .target-marker {
   position: absolute;
-  width: 0;
-  height: 0;
+  width: 0; height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
   border-bottom: 15px solid #ff3d00;
@@ -77,96 +68,67 @@ h1{ font-weight:300; letter-spacing:2px; margin-bottom:10px; font-size: 1rem; op
   display: none;
 }
 
+.bubble{
+  width:26px;
+  height:26px;
+  border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, #fff, cyan);
+  position:absolute;
+  left:50%; top:50%;
+  transform:translate(-50%,-50%);
+  z-index: 8;
+  box-shadow: 0 0 15px rgba(0,255,255,0.4);
+}
+.bubble.centered {
+  background: radial-gradient(circle at 30% 30%, #fff, #ffeb3b);
+  box-shadow: 0 0 25px rgba(255,235,59,1);
+}
+
 .cross{
   position:absolute;
-  width:80px;
-  height:80px;
+  width:80px; height:80px;
   pointer-events:none;
   z-index: 10;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 50%;
 }
 .cross::before, .cross::after{
-  content:"";
-  position:absolute;
-  background:rgba(255,255,255,0.3);
+  content:""; position:absolute; background:rgba(255,255,255,0.3);
 }
 .cross::before{ top:50%; left:0; width:100%; height:1px; transform:translateY(-50%);}
 .cross::after{ left:50%; top:0; width:1px; height:100%; transform:translateX(-50%);}
 
-.bubble{
-  width:24px;
-  height:24px;
-  border-radius:50%;
-  background:radial-gradient(circle at 30% 30%, #aef, cyan);
-  position:absolute;
-  left:50%;
-  top:50%;
-  transform:translate(-50%,-50%);
-  opacity:0.9;
-  transition: background 0.2s, box-shadow 0.2s;
-  z-index: 8;
-  box-shadow: 0 0 10px rgba(0,255,255,0.3);
-}
-.bubble.centered {
-  background: radial-gradient(circle at 30% 30%, #fffbcf, #ffeb3b);
-  box-shadow: 0 0 20px rgba(255,235,59,0.8);
-}
-
 .arrow{
-  width:4px;
-  height:125px;
+  width:4px; height:125px;
   background:linear-gradient(to top, #00f2ff, white);
   position:absolute;
-  bottom:50%;
-  left:50%;
+  bottom:50%; left:50%;
   transform:translateX(-50%);
-  border-radius:2px;
   z-index:12;
 }
 
-/* 数値表示エリア */
 .display-container {
-  margin-top: 20px;
-  display: flex;
-  gap: 20px;
-  align-items: flex-end;
-  font-variant-numeric: tabular-nums;
+  margin-top: 25px;
+  display: flex; gap: 20px; align-items: flex-end;
 }
-.sub-display {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 70px;
-}
-.sub-label { font-size: 10px; opacity: 0.5; text-transform: uppercase; }
+.sub-display { display: flex; flex-direction: column; align-items: center; width: 70px; }
+.sub-label { font-size: 10px; opacity: 0.5; }
 .sub-val { font-size: 16px; font-weight: 300; }
-
-.main-display {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100px;
-}
-.main-label { font-size: 12px; color: cyan; font-weight: bold; }
+.main-display { display: flex; flex-direction: column; align-items: center; width: 100px; }
 .main-val { font-size: 42px; font-weight: bold; line-height: 1; }
 
 .controls { margin-top: 30px; }
-
 button{
-  padding:12px 20px;
-  border:none;
-  border-radius:25px;
-  background:rgba(255,255,255,0.1);
-  color:white;
-  font-size:14px;
-  margin: 5px;
+  padding:12px 24px; border-radius:25px;
+  background:rgba(255,255,255,0.05); color:white;
   border: 1px solid rgba(255,255,255,0.2);
 }
-#startBtn { background:linear-gradient(45deg,#00d2ff,#6a5cff); border:none; padding: 15px 40px; font-size: 1.1rem; }
+#startBtn { background:linear-gradient(45deg,#00d2ff,#6a5cff); border:none; padding: 15px 40px; }
 </style>
 </head>
 <body>
 
-<h1>SOUND COMPASS</h1>
+<h1>SOUND COMPASS v1.5.0</h1>
 
 <div class="compass">
   <div class="dial" id="dial">
@@ -178,18 +140,9 @@ button{
 </div>
 
 <div class="display-container">
-    <div class="sub-display">
-        <span class="sub-label">Target</span>
-        <span class="sub-val" id="targetVal">0°</span>
-    </div>
-    <div class="main-display">
-        <span class="main-label" id="modeLabel">NORTH</span>
-        <span class="main-val" id="currentVal">--°</span>
-    </div>
-    <div class="sub-display">
-        <span class="sub-label">Diff</span>
-        <span class="sub-val" id="diffVal">0°</span>
-    </div>
+    <div class="sub-display"><span class="sub-label">TARGET</span><span id="targetVal" class="sub-val">0°</span></div>
+    <div class="main-display"><span id="modeLabel" style="font-size:10px; color:cyan;">NORTH</span><span id="currentVal" class="main-val">--°</span></div>
+    <div class="sub-display"><span class="sub-label">DIFF</span><span id="diffVal" class="sub-val">0°</span></div>
 </div>
 
 <div class="controls">
@@ -204,26 +157,23 @@ let heading = 0, displayHeading = 0, target = 0;
 let useNorth = true, lastBeep = 0, soundEnabled = true;
 let smoothX = 0, smoothY = 0;
 
+// 目盛り生成
 const dial = document.getElementById('dial');
 const mainPoints = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' };
-
 for (let i = 0; i < 360; i += 15) {
     const tick = document.createElement('div');
     tick.className = (i % 45 === 0) ? 'tick large' : 'tick';
     tick.style.transform = `rotate(${i}deg)`;
     dial.appendChild(tick);
-
     if (mainPoints[i] !== undefined) {
         const span = document.createElement('div');
         span.className = 'cardinal';
         if(i === 0) span.classList.add('north');
         span.textContent = mainPoints[i];
         const angleRad = (i - 90) * (Math.PI / 180);
-        const radius = 105; 
-        const x = 140 + radius * Math.cos(angleRad);
-        const y = 140 + radius * Math.sin(angleRad);
-        span.style.left = `${x}px`;
-        span.style.top = `${y}px`;
+        const x = 140 + 105 * Math.cos(angleRad);
+        const y = 140 + 105 * Math.sin(angleRad);
+        span.style.left = `${x}px`; span.style.top = `${y}px`;
         span.style.transform = `translate(-50%, -50%) rotate(${i}deg)`;
         dial.appendChild(span);
     }
@@ -233,79 +183,67 @@ function initAudio(){
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   osc = audioCtx.createOscillator();
   gainNode = audioCtx.createGain();
-  osc.type = "sine";
+  osc.type = "triangle"; // 少しハッキリした音色に変更
   osc.connect(gainNode);
   gainNode.connect(audioCtx.destination);
   gainNode.gain.value = 0;
   osc.start();
 }
 
-function normalize(angle){ return ((angle % 360) + 360) % 360; }
-function getDiff(target,current){
-  let diff = target - current;
-  diff = (diff + 540) % 360 - 180;
-  return diff;
-}
-
 function handleOrientation(event){
-  if(event.webkitCompassHeading !== undefined){
-    heading = event.webkitCompassHeading;
-  }else{
-    heading = 360 - event.alpha;
-  }
+  heading = event.webkitCompassHeading || (360 - event.alpha);
   if(heading == null) return;
-  heading = normalize(heading);
+  heading = ((heading % 360) + 360) % 360;
 
-  let diffAngle = heading - displayHeading;
-  diffAngle = (diffAngle + 540) % 360 - 180;
+  let diffAngle = (heading - displayHeading + 540) % 360 - 180;
   displayHeading += diffAngle * 0.2;
-
   document.getElementById("dial").style.transform = `rotate(${-displayHeading}deg)`;
   
-  const diff = getDiff(target, heading);
+  const diff = (target - heading + 540) % 360 - 180;
   const absDiff = Math.abs(diff);
 
-  // 数値更新
   document.getElementById("currentVal").textContent = `${Math.round(heading)}°`;
   document.getElementById("targetVal").textContent = `${Math.round(target)}°`;
   document.getElementById("diffVal").textContent = `${diff > 0 ? '+' : ''}${Math.round(diff)}°`;
 
-  // 相対モードの時だけダイヤル上に赤いターゲットマーカーを表示
   const marker = document.getElementById("targetMarker");
-  if(!useNorth) {
-      marker.style.display = "block";
-      marker.style.transform = `rotate(${target}deg)`;
-  } else {
-      marker.style.display = "none";
+  marker.style.display = useNorth ? "none" : "block";
+  marker.style.transform = `rotate(${target}deg)`;
+
+  // ---- 水平バブル（天井向き対策） ----
+  let rawX = event.gamma || 0;
+  let rawY = event.beta || 0;
+
+  // betaが70度〜110度（スマホを立てている状態）ならバブルを中央付近で固定
+  // これにより天井に向けた時の「グルン」を抑制
+  if(Math.abs(rawY) > 70) {
+      rawX = 0; rawY = (rawY > 0) ? 45 : -45; 
   }
 
-  // ---- 水平バブル ----
-  const rawX = event.gamma || 0;
-  const rawY = event.beta || 0;
-  const limit = 45;
-  const moveX = Math.max(-limit, Math.min(limit, rawX));
-  const moveY = Math.max(-limit, Math.min(limit, rawY));
-  smoothX = smoothX * 0.8 + moveX * 0.2;
-  smoothY = smoothY * 0.8 + moveY * 0.2;
+  const limit = 50;
+  smoothX = smoothX * 0.8 + Math.max(-limit, Math.min(limit, rawX)) * 0.2;
+  smoothY = smoothY * 0.8 + Math.max(-limit, Math.min(limit, rawY)) * 0.2;
 
   const bubbleEl = document.getElementById("bubble");
   bubbleEl.style.transform = `translate(calc(-50% + ${smoothX}px), calc(-50% + ${smoothY}px))`;
+  bubbleEl.className = (Math.abs(rawX) < 3 && Math.abs(rawY) < 3) ? 'bubble centered' : 'bubble';
 
-  if(Math.abs(rawX) < 3 && Math.abs(rawY) < 3) {
-      bubbleEl.classList.add('centered');
-  } else {
-      bubbleEl.classList.remove('centered');
-  }
-
-  // ---- 音ロジック ----
+  // ---- 音ロジック（ハッキリ・大きめ） ----
   if(!soundEnabled || !audioCtx) return;
-  if(absDiff <= 5){
-    osc.frequency.setTargetAtTime(1200, audioCtx.currentTime, 0.1);
-    gainNode.gain.setTargetAtTime(0.2, audioCtx.currentTime, 0.1);
-  } else {
-    gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+
+  if(absDiff <= 6){ // 基準一致（高音連続音）
+    osc.frequency.setTargetAtTime(1000, audioCtx.currentTime, 0.05);
+    gainNode.gain.setTargetAtTime(0.3, audioCtx.currentTime, 0.05);
+  } 
+  else if(absDiff >= 174){ // 真反対（低音連続音）
+    osc.frequency.setTargetAtTime(200, audioCtx.currentTime, 0.05);
+    gainNode.gain.setTargetAtTime(0.3, audioCtx.currentTime, 0.05);
+  }
+  else { // ズレている間（断続音）
+    gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
     const now = Date.now();
-    if(now - lastBeep > (150 + absDiff * 4)){ 
+    // ズレるほど間隔が広がる。150ms〜800ms程度。
+    if(now - lastBeep > (120 + absDiff * 4)){ 
       beep(absDiff);
       lastBeep = now;
     }
@@ -316,14 +254,16 @@ function beep(absDiff){
   if(!soundEnabled) return;
   const o = audioCtx.createOscillator();
   const g = audioCtx.createGain();
-  const freq = 400 + (1 - Math.min(absDiff,180)/180)*600;
+  o.type = "square"; // 断続音はよりハッキリした矩形波
+  // 基準に近いほど高音、遠いほど低音
+  const freq = 300 + (1 - absDiff/180) * 600;
   o.frequency.value = freq;
   o.connect(g);
   g.connect(audioCtx.destination);
-  g.gain.setValueAtTime(0.2, audioCtx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+  g.gain.setValueAtTime(0.25, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
   o.start();
-  o.stop(audioCtx.currentTime + 0.12);
+  o.stop(audioCtx.currentTime + 0.15);
 }
 
 document.getElementById("startBtn").addEventListener("click", async()=>{
@@ -340,7 +280,7 @@ document.getElementById("startBtn").addEventListener("click", async()=>{
 
 document.getElementById("modeBtn").addEventListener("click",()=>{
   useNorth = !useNorth;
-  target = useNorth ? 0 : normalize(heading);
+  target = useNorth ? 0 : ((heading % 360) + 360) % 360;
   document.getElementById("modeBtn").textContent = useNorth ? "北基準" : "相対基準";
   document.getElementById("modeLabel").textContent = useNorth ? "NORTH" : "RELATIVE";
 });
