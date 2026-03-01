@@ -2,12 +2,13 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sound Compass Pro v1.6.0</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Sound Compass Pro v1.7.0</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js"></script>
 <style>
-/* スタイルは変更なし（一部省略） */
-body{ margin:0; background:#0f1117; color:white; font-family: system-ui; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow: hidden; }
-h1{ font-weight:300; letter-spacing:2px; margin-bottom:10px; font-size: 0.9rem; opacity: 0.4; }
+/* スタイルは変更なし */
+body{ margin:0; background:#0f1117; color:white; font-family: system-ui; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; overflow: hidden; touch-action: none; }
+h1{ font-weight:300; letter-spacing:2px; margin-bottom:10px; font-size: 0.8rem; opacity: 0.3; }
 .compass{ width:280px; height:280px; border-radius:50%; border:2px solid rgba(255,255,255,0.1); position:relative; display:flex; align-items:center; justify-content:center; }
 .dial{ width:100%; height:100%; position:absolute; }
 .tick { position: absolute; width: 2px; height: 10px; background: rgba(255,255,255,0.2); top: 5px; left: calc(50% - 1px); transform-origin: 1px 135px; }
@@ -29,13 +30,13 @@ h1{ font-weight:300; letter-spacing:2px; margin-bottom:10px; font-size: 0.9rem; 
 .main-display { display: flex; flex-direction: column; align-items: center; width: 100px; }
 .main-val { font-size: 42px; font-weight: bold; line-height: 1; font-variant-numeric: tabular-nums; }
 .controls { margin-top: 30px; }
-button{ padding:12px 24px; border-radius:25px; background:rgba(255,255,255,0.05); color:white; border: 1px solid rgba(255,255,255,0.2); cursor: pointer;}
+button{ padding:12px 24px; border-radius:25px; background:rgba(255,255,255,0.05); color:white; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; -webkit-tap-highlight-color: transparent; }
 #startBtn { background:linear-gradient(45deg,#00d2ff,#6a5cff); border:none; padding: 15px 40px; }
 </style>
 </head>
 <body>
 
-<h1>SOUND COMPASS v1.6.0</h1>
+<h1>SOUND COMPASS v1.7.0</h1>
 <div class="compass">
   <div class="dial" id="dial"><div class="target-marker" id="targetMarker"></div></div>
   <div class="bubble" id="bubble"></div>
@@ -58,8 +59,9 @@ let audioCtx, osc, gainNode;
 let heading = 0, displayHeading = 0, target = 0;
 let useNorth = true, lastBeep = 0, soundEnabled = true;
 let smoothX = 0, smoothY = 0;
+const noSleep = new NoSleep();
 
-// 目盛り生成ロジック
+// 目盛り生成
 const dial = document.getElementById('dial');
 const mainPoints = { 0: 'N', 90: 'E', 180: 'S', 270: 'W' };
 for (let i = 0; i < 360; i += 15) {
@@ -81,6 +83,20 @@ for (let i = 0; i < 360; i += 15) {
     }
 }
 
+async function resumeAudio() {
+  if (audioCtx && audioCtx.state === 'suspended') {
+    await audioCtx.resume();
+    console.log("Audio resumed");
+  }
+}
+
+// 復帰時の自動リトライロジック
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    resumeAudio();
+  }
+});
+
 function initAudio(){
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   osc = audioCtx.createOscillator();
@@ -93,10 +109,13 @@ function initAudio(){
 }
 
 function handleOrientation(event){
+  // スリープから戻った時に状態を確認
+  if (audioCtx && audioCtx.state === 'suspended' && soundEnabled) {
+      audioCtx.resume();
+  }
+
   let rawHeading = event.webkitCompassHeading || (360 - event.alpha);
   if(rawHeading == null) return;
-  
-  // 360度を0度にする処理
   heading = Math.round(rawHeading) % 360;
 
   let diffAngle = (heading - displayHeading + 540) % 360 - 180;
@@ -104,7 +123,7 @@ function handleOrientation(event){
   document.getElementById("dial").style.transform = `rotate(${-displayHeading}deg)`;
   
   const diff = (target - heading + 540) % 360 - 180;
-  const absDiff = Math.abs(Math.round(diff)); // 判定用に整数化
+  const absDiff = Math.abs(Math.round(diff));
 
   document.getElementById("currentVal").textContent = `${heading}°`;
   document.getElementById("targetVal").textContent = `${Math.round(target) % 360}°`;
@@ -114,11 +133,8 @@ function handleOrientation(event){
   marker.style.display = useNorth ? "none" : "block";
   marker.style.transform = `rotate(${target}deg)`;
 
-  // ---- 水平バブル（iOS純正風：全方位補正） ----
   let x = event.gamma || 0;
   let y = event.beta || 0;
-
-  // スマホをひっくり返した（逆さまにした）時の座標反転補正
   if (y > 90) y = 180 - y;
   if (y < -90) y = -180 - y;
   if (Math.abs(event.beta) > 90) x = -x;
@@ -130,17 +146,15 @@ function handleOrientation(event){
   const bubbleEl = document.getElementById("bubble");
   bubbleEl.style.transform = `translate(calc(-50% + ${smoothX}px), calc(-50% + ${smoothY}px))`;
   
-  // 中心判定を厳密に
   if(Math.abs(x) < 2.5 && Math.abs(y) < 2.5) {
       bubbleEl.classList.add('centered');
   } else {
       bubbleEl.classList.remove('centered');
   }
 
-  // ---- 音ロジック（ズレ防止修正） ----
-  if(!soundEnabled || !audioCtx) return;
+  if(!soundEnabled || !audioCtx || audioCtx.state !== 'running') return;
 
-  if(absDiff <= 5){ // きっかり5度以内の判定
+  if(absDiff <= 5){
     osc.frequency.setTargetAtTime(1000, audioCtx.currentTime, 0.03);
     gainNode.gain.setTargetAtTime(0.3, audioCtx.currentTime, 0.03);
   } 
@@ -159,7 +173,7 @@ function handleOrientation(event){
 }
 
 function beep(absDiff){
-  if(!soundEnabled) return;
+  if(!soundEnabled || !audioCtx || audioCtx.state !== 'running') return;
   const o = audioCtx.createOscillator();
   const g = audioCtx.createGain();
   o.type = "square";
@@ -178,6 +192,10 @@ document.getElementById("startBtn").addEventListener("click", async()=>{
     const permission = await DeviceOrientationEvent.requestPermission();
     if(permission !== "granted") return;
   }
+  
+  // スリープ防止を有効化
+  noSleep.enable();
+  
   initAudio();
   window.addEventListener("deviceorientation", handleOrientation);
   document.getElementById("startBtn").style.display="none";
@@ -186,15 +204,20 @@ document.getElementById("startBtn").addEventListener("click", async()=>{
 });
 
 document.getElementById("modeBtn").addEventListener("click",()=>{
+  resumeAudio(); // ボタン操作のついでに復帰
   useNorth = !useNorth;
   target = useNorth ? 0 : heading;
   document.getElementById("modeBtn").textContent = useNorth ? "北基準" : "相対基準";
   document.getElementById("modeLabel").textContent = useNorth ? "NORTH" : "RELATIVE";
 });
 
-document.getElementById("soundBtn").addEventListener("click", ()=>{
+document.getElementById("soundBtn").addEventListener("click", async ()=>{
   soundEnabled = !soundEnabled;
-  if(!soundEnabled && gainNode) gainNode.gain.value = 0;
+  if(soundEnabled) {
+    await resumeAudio();
+  } else if(gainNode) {
+    gainNode.gain.value = 0;
+  }
   document.getElementById("soundBtn").textContent = soundEnabled ? "音: ON" : "音: OFF";
 });
 </script>
