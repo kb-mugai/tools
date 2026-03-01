@@ -42,7 +42,10 @@ h1{
   height:90px;
   background:linear-gradient(to top, cyan, white);
   position:absolute;
-  top:20px;
+  bottom:50%;
+  left:50%;
+  transform-origin:50% 100%; /* ← ここ重要 */
+  transform:translateX(-50%) rotate(0deg);
   border-radius:2px;
 }
 
@@ -120,33 +123,35 @@ function handleOrientation(event){
     .style.transform = `rotate(${heading}deg)`;
 
   const diff = getDiff(target, heading);
-  const absDiff = Math.abs(diff);
+const absDiff = Math.abs(diff);
 
-  document.getElementById("info").textContent =
-    `現在:${Math.round(heading)}°  ズレ:${Math.round(diff)}°`;
+if(absDiff <= 5){
+  // 完全一致 → 高音連続
+  osc.frequency.value = 1200;
+  gainNode.gain.value = 0.25;
+}
+else if(absDiff >= 175){
+  // 真反対 → 低音連続
+  osc.frequency.value = 200;
+  gainNode.gain.value = 0.25;
+}
+else{
+  gainNode.gain.value = 0;
 
   const now = Date.now();
 
-  if(absDiff <= 5){
-    // 完全一致 → 連続音
-    osc.frequency.value = 1200;
-    gainNode.gain.value = 0.25;
-  }
-  else{
-    gainNode.gain.value = 0;
-
-    if(absDiff < 45){
-      if(now - lastBeep > 120){
-        beep(absDiff);
-        lastBeep = now;
-      }
-    }else{
-      if(now - lastBeep > 400){
-        beep(absDiff);
-        lastBeep = now;
-      }
+  if(absDiff < 45){
+    if(now - lastBeep > 120){
+      beep(absDiff);
+      lastBeep = now;
+    }
+  }else{
+    if(now - lastBeep > 400){
+      beep(absDiff);
+      lastBeep = now;
     }
   }
+}
 }
 
 function beep(absDiff){
