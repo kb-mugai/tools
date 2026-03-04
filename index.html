@@ -3,102 +3,253 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Web Tools Collection</title>
-  <meta name="description" content="Web上で使える便利なWEBアプリ集。ルーレット、QRコード生成、パスワード強度チェッカー等がブラウザ上で無料で使えます。">
+  <title>Web Tools Collection | 無料ブラウザWEBアプリ集</title>
+  <meta name="description" content="音コンパス、Chip Monster、QR生成など、ブラウザ上で今すぐ使える便利なWEBアプリ集。登録不要・完全無料。">
   <link rel="icon" href="favicon.ico">
   <style>
+    :root {
+      --primary-color: #1a73e8;
+      --bg-color: #f0f2f5;
+      --card-bg: #ffffff;
+      --text-main: #333;
+      --text-sub: #666;
+      --accent-color: #ff9800;
+    }
+
     body {
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       max-width: 800px;
-      margin: 40px auto;
-      padding: 0 20px;
-      background: #f9f9f9;
-      color: #333;
+      margin: 0 auto;
+      padding: 40px 20px;
+      background: var(--bg-color);
+      color: var(--text-main);
+      line-height: 1.6;
     }
+
+    header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+
     h1 {
-      text-align: center;
-      margin-bottom: 10px;
+      font-size: 2rem;
+      margin-bottom: 8px;
+      color: #1a1f23;
     }
-    p {
-      text-align: center;
-      margin-bottom: 40px;
+
+    .lead {
+      color: var(--text-sub);
+      margin-bottom: 15px;
     }
+
+    .achievement-badge {
+      display: inline-block;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      padding: 6px 15px;
+      border-radius: 50px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      color: var(--primary-color);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: var(--text-sub);
+      margin: 40px 0 15px 5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-left: 4px solid #ccc;
+      padding-left: 10px;
+    }
+
     ul {
       list-style: none;
       padding: 0;
+      display: grid;
+      gap: 16px;
     }
+
     li {
-      margin: 20px 0;
-      padding: 15px;
-      background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-      transition: transform 0.1s;
+      background: var(--card-bg);
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      transition: all 0.2s ease;
+      overflow: hidden;
     }
+
     li:hover {
-      transform: translateY(-2px);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.1);
     }
+
     a {
       text-decoration: none;
-      color: #1a73e8;
-      font-size: 1.2em;
-      display: block;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      color: var(--text-main);
     }
-    a span {
+
+    /* --- アイコン画像用の汎用スタイル --- */
+    .app-icon-container {
+      flex-shrink: 0;
+      width: 64px;
+      height: 64px;
+      margin-right: 20px;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #eee; /* 画像がない時の背景色 */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .app-icon-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    /* ---------------------------------- */
+
+    .app-info {
+      flex-grow: 1;
+    }
+
+    .app-name {
       display: block;
-      font-size: 0.85em;
-      color: #555;
-      margin-top: 5px;
+      font-size: 1.15rem;
+      font-weight: bold;
+      margin-bottom: 4px;
+      color: #111;
+    }
+
+    .app-desc {
+      display: block;
+      font-size: 0.9rem;
+      color: var(--text-sub);
+      line-height: 1.4;
+    }
+
+    .featured {
+      border: 2px solid var(--accent-color);
+      position: relative;
+    }
+
+    .featured::after {
+      content: "新作";
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: var(--accent-color);
+      color: white;
+      font-size: 0.7rem;
+      padding: 2px 10px;
+      border-radius: 0 0 0 12px;
+    }
+
+    @media (max-width: 600px) {
+      body { padding: 20px 15px; }
+      .app-icon-container { width: 52px; height: 52px; margin-right: 15px; }
     }
   </style>
 </head>
 <body>
-  <h1>Web Tools Collection</h1>
-  <p>ブラウザ上で動作する便利なツール集です。登録不要で無料です。</p>
-  <ul>
 
-    <li>
-    <a href="roulette/">カスタムルーレット
-      <span>角度指定や項目名も自由に設定できるルーレット</span>
-    </a>
-    </li>
-    
-    <li>
-      <a href="censorbar/">目線加工ツール（Censor Bar）
-      <span>写真の目線加工ツール。モザイクもできます。</span>
-      </a>
-    </li>
+  <header>
+    <h1>Web Tools Collection</h1>
+    <p class="lead">インストール不要、ブラウザですぐに使える無料ツール集</p>
+  </header>
 
-    <li>
-      <a href="qrcode/">QRコードメーカー
-      <span>色指定（グラデーション）やアイコン挿入もできます。</span>
-      </a>
-    </li>
+  <main>
+    <div class="section-title">Sound & Creative</div>
+    <ul>
+      <li class="featured">
+        <a href="sound-compass/">
+          <div class="app-icon-container">
+            <img src="sound-compass/icon.png" alt="Sound Compass">
+          </div>
+          <div class="app-info">
+            <span class="app-name">Sound Compass</span>
+            <span class="app-desc">スマホの向きで音が変化。北だけでなく任意方角の設定もできる音コンパス。</span>
+          </div>
+        </a>
+      </li>
+      <li>
+        <a href="monster-voice/">
+          <div class="app-icon-container">
+            <img src="monster-voice/icon.png" alt="Chip Monster">
+          </div>
+          <div class="app-info">
+            <span class="app-name">Chip Monster Voice Generator</span>
+            <span class="app-desc">テキストから初代ポ●モン風の鳴き声に変換。作成した音声の保存もできます。</span>
+          </div>
+        </a>
+      </li>
+      <li>
+        <a href="unkocrypt/">
+          <div class="app-icon-container">
+            <img src="unkocrypt/icon.png" alt="Unko Cipher">
+          </div>
+          <div class="app-info">
+            <span class="app-name">うんこ暗号（うんこ くりぷと）</span>
+            <span class="app-desc">どんな言葉も💩な秘密メッセージに変換！解読もこちらからできます。</span>
+          </div>
+        </a>
+      </li>
+    </ul>
 
-    <li>
-      <a href="password-checker/">パスワード強度チェッカー
-      <span>シンプル基準のパスワード強度チェッカー。おまけで総当たり攻撃耐性チェックもあります。</span>
-      </a>
-    </li>
+    <div class="section-title">Utility Tools</div>
+    <ul>
+      <li>
+        <a href="qrcode/">
+          <div class="app-icon-container">
+            <img src="qrcode/icon.png" alt="QR Code">
+          </div>
+          <div class="app-info">
+            <span class="app-name">QRコードメーカー</span>
+            <span class="app-desc">グラデーションやアイコン入りのおしゃれなQRを生成。</span>
+          </div>
+        </a>
+      </li>
+      <li>
+        <a href="censorbar/">
+          <div class="app-icon-container">
+            <img src="censorbar/icon.png" alt="Censor Bar">
+          </div>
+          <div class="app-info">
+            <span class="app-name">目線加工ツール（Censor Bar）</span>
+            <span class="app-desc">黒目線＆モザイク線をさっと引けます。</span>
+          </div>
+        </a>
+      </li>
+      <li>
+        <a href="password-checker/">
+          <div class="app-icon-container">
+            <img src="password-checker/icon.png" alt="Password Checker">
+          </div>
+          <div class="app-info">
+            <span class="app-name">パスワード強度チェッカー</span>
+            <span class="app-desc">独自の解析基準で安全性をチェック。総当たり耐性も。</span>
+          </div>
+        </a>
+      </li>
+      <li>
+        <a href="roulette/">
+          <div class="app-icon-container">
+            <img src="roulette/icon.png" alt="Roulette">
+          </div>
+          <div class="app-info">
+            <span class="app-name">カスタムルーレット</span>
+            <span class="app-desc">項目数や色・角度割合を自由にカスタムしよう。</span>
+          </div>
+        </a>
+      </li>
+    </ul>
+  </main>
 
-    <li>
-      <a href="unkocrypt/">うんこ暗号（うんこくりぷと）
-      <span>このサイトでしか解読できない！？素敵な暗号化ツール（ジョークの範囲でお使いください）</span>
-      </a>
-    </li>
-
-    <li>
-      <a href="monster-voice/">Lo-Fi Monster Voice Generator
-      <span>テキストを音声変換して初代ポ●モンっぽい8bit風鳴き声を生成します。</span>
-      </a>
-    </li>
-
-    <li>
-      <a href="sound-compass/">Sound Compass
-      <span>スマホ専用。音の鳴るコンパスです。北基準と現在方向基準モードがあります。</span>
-      </a>
-    </li>
-
-<script data-goatcounter="https://kb-mugai.goatcounter.com/count"async src="//gc.zgo.at/count.js"></script>
+  <script data-goatcounter="https://kb-mugai.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
