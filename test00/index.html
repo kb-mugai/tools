@@ -1,98 +1,272 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smooth Bonfire Hypnosis</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+<meta charset="UTF-8">
+<title>Perfect Heart Tunnel v5</title>
 
-        #fire-light {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(circle at center, #ff8c00 0%, #ff4500 40%, #8b0000 80%, #000 100%);
-            animation: colorShift 10s infinite alternate ease-in-out;
-            
-            /* --- 修正ポイント：ここから --- */
-            /* 0.2秒かけて変化を繋ぐ。ease-outで変化の終わりをよりソフトに */
-            transition: opacity 0.2s ease-out; 
-            will-change: opacity; 
-            /* --- 修正ポイント：ここまで --- */
-        }
+<style>
+body, html {
+margin:0;
+padding:0;
+width:100%;
+height:100%;
+overflow:hidden;
+background:#000;
+}
 
-        #noise-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAAV0lEQVRoQ+3BQREAAAgCQMC/bAsXCOwI6VfX4zX3Xo7Hw+FwOBwOh8PhcDgcDofD4XA4HA6Hw+FwOBwOh8PhcDgcDofD4XA4HA6Hw+FwOBwOh8PhcDj8HRwO+w4L8h4LggAAAABJRU5ErkJggg==");
-            background-repeat: repeat;
-            opacity: 0.1; /* チラつきを抑えるため少し薄くしました */
-            pointer-events: none;
-        }
+canvas{
+display:block;
+}
 
-        @keyframes colorShift {
-            0% { filter: hue-rotate(0deg) saturate(1); }
-            100% { filter: hue-rotate(15deg) saturate(1.2); }
-        }
-
-        #ui {
-            position: relative;
-            color: rgba(255, 255, 255, 0.4);
-            font-family: 'Courier New', Courier, monospace;
-            text-align: center;
-            pointer-events: none;
-        }
-    </style>
+#gyroButton{
+position:fixed;
+top:20px;
+left:50%;
+transform:translateX(-50%);
+padding:12px 20px;
+font-size:16px;
+border:none;
+border-radius:8px;
+background:#ff1493;
+color:white;
+z-index:10;
+display:none;
+}
+</style>
 </head>
+
 <body>
 
-    <div id="fire-light"></div>
-    <div id="noise-overlay"></div>
+<button id="gyroButton">ジャイロを有効化</button>
+<canvas id="canvas"></canvas>
 
-    <div id="ui">
-        <h1>BONFIRE HYPNOSIS</h1>
-        <p>Gaze into the light...</p>
-    </div>
+<script>
 
-    <script>
-        const fireLight = document.getElementById('fire-light');
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
 
-        function flicker() {
-            // 明るさの落差を小さく調整 (0.8 〜 1.0の間)
-            const baseOpacity = 0.8;
-            const randomVariance = Math.random() * 0.2;
-            const newOpacity = baseOpacity + randomVariance;
+let width,height;
+let rings=[];
 
-            fireLight.style.opacity = newOpacity;
+let tiltX=0;
+let smoothTilt=0;
 
-            // 次の変化までの時間を少し伸ばして、transitionが効く余白を作る
-            // (150ms 〜 300ms)
-            const nextFlicker = 150 + (Math.random() * 150);
-            
-            setTimeout(flicker, nextFlicker);
-        }
+const config={
+spawnInterval:300,
+expandSpeed:0.0006,
+color:"#ffc0e2",
+centerColor:"#ff1493",
+lineWidth:35
+};
 
-        flicker();
+const heartPathData="M50 85 C45 75 30 65 20 55 C5 40 15 20 35 25 C45 28 48 35 50 40 C52 35 55 28 65 25 C85 20 95 40 80 55 C70 65 55 75 50 85 Z";
+const baseHeartPath=new Path2D(heartPathData);
 
-        document.body.addEventListener('click', () => {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen();
-            } else {
-                if (document.exitFullscreen) document.exitFullscreen();
-            }
-        });
-    </script>
+function resize(){
+width=canvas.width=window.innerWidth;
+height=canvas.height=window.innerHeight;
+}
+
+window.addEventListener("resize",resize);
+resize();
+
+/* ジャイロ */
+
+function initGyro(){
+
+window.addEventListener("deviceorientation",(e)=>{
+
+tiltX=e.gamma||0;
+
+});
+
+}
+
+/* iOS許可 */
+
+const gyroButton=document.getElementById("gyroButton");
+
+if(typeof DeviceOrientationEvent!=="undefined" &&
+typeof DeviceOrientationEvent.requestPermission==="function"){
+
+gyroButton.style.display="block";
+
+gyroButton.onclick=()=>{
+
+DeviceOrientationEvent.requestPermission()
+.then(res=>{
+if(res==="granted"){
+initGyro();
+gyroButton.style.display="none";
+}
+});
+
+};
+
+}else{
+
+initGyro();
+
+}
+
+/* リング */
+
+class Ring{
+
+constructor(){
+
+this.startTime=Date.now();
+this.scale=0;
+this.opacity=1;
+
+}
+
+update(now){
+
+const elapsed=now-this.startTime;
+
+this.scale=Math.pow(elapsed*config.expandSpeed,2.2);
+
+if(this.scale>7){
+this.opacity-=0.05;
+}
+
+}
+
+draw(){
+
+if(this.scale<0.1||this.opacity<=0)return;
+
+ctx.save();
+
+ctx.translate(width/2,height/2);
+
+const s=this.scale*15;
+
+ctx.scale(s,s);
+
+ctx.translate(-50,-58);
+
+ctx.globalAlpha=this.opacity;
+
+ctx.strokeStyle=config.color;
+
+ctx.lineWidth=config.lineWidth/s;
+
+ctx.lineJoin="miter";
+ctx.miterLimit=10;
+
+ctx.stroke(baseHeartPath);
+
+ctx.restore();
+
+}
+
+}
+
+let lastSpawn=0;
+
+function loop(){
+
+const now=Date.now();
+
+/* 背景ゆらぎ */
+
+const t=now*0.001;
+const glow=10+Math.sin(t*0.8)*5;
+
+ctx.globalAlpha=0.85;
+ctx.fillStyle=`hsl(330,100%,${45+glow}%)`;
+ctx.fillRect(0,0,width,height);
+ctx.globalAlpha=1;
+
+/* ジャイロ回転 */
+
+ctx.save();
+
+const target=tiltX*0.01;
+
+smoothTilt+=(target-smoothTilt)*0.1;
+
+ctx.translate(width/2,height/2);
+ctx.rotate(smoothTilt);
+ctx.translate(-width/2,-height/2);
+
+/* リング生成 */
+
+if(now-lastSpawn>config.spawnInterval){
+
+rings.push(new Ring());
+lastSpawn=now;
+
+}
+
+for(let i=rings.length-1;i>=0;i--){
+
+rings[i].update(now);
+rings[i].draw();
+
+if(rings[i].opacity<=0){
+rings.splice(i,1);
+}
+
+}
+
+/* 中心グロー */
+
+const grad=ctx.createRadialGradient(
+width/2,height/2,0,
+width/2,height/2,350
+);
+
+grad.addColorStop(0,"rgba(255,20,147,0.35)");
+grad.addColorStop(1,"rgba(255,20,147,0)");
+
+ctx.fillStyle=grad;
+ctx.fillRect(0,0,width,height);
+
+/* ハート鼓動 */
+
+ctx.save();
+
+ctx.translate(width/2,height/2);
+
+const beat=Math.sin(now/1000*Math.PI*2*(115/60));
+
+const pulse=2.5+(beat>0?Math.pow(beat,2)*0.5:0);
+
+ctx.scale(pulse,pulse);
+
+ctx.translate(-50,-58);
+
+ctx.fillStyle=config.centerColor;
+
+ctx.fill(baseHeartPath);
+
+ctx.restore();
+
+/* フォグ */
+
+const fog=ctx.createRadialGradient(
+width/2,height/2,width*0.3,
+width/2,height/2,width*0.9
+);
+
+fog.addColorStop(0,"rgba(0,0,0,0)");
+fog.addColorStop(1,"rgba(0,0,0,0.45)");
+
+ctx.fillStyle=fog;
+ctx.fillRect(0,0,width,height);
+
+ctx.restore();
+
+requestAnimationFrame(loop);
+
+}
+
+loop();
+
+</script>
+
 </body>
 </html>

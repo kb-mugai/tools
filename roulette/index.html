@@ -1,698 +1,1395 @@
 <!DOCTYPE html>
+
 <html lang="ja">
+
 <head>
+
 <link rel="icon" href="favicon.png" type="image/png">
+
 <meta charset="UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <title>カスタムルーレット｜角度や色指定・表示切替と多機能</title>
+
 <meta name="description"
+
   content="角度指定できるカスタムルーレット。要素の表示/非表示、色編集、均等割り対応。登録不要・無料で使えます。">
+
   <link rel="stylesheet" href="../common.css"> <!-- 共通 CSS -->
+
 <style>
 
 
+
+
+
 body {
+
   font-family: sans-serif;
+
   display: flex;
+
   flex-direction: column;
+
+
 
   padding: 20px;
+
 }
+
+
 
 /* iOSズーム防止（超重要） */
+
 input, button {
+
   font-size: 16px;
+
 }
+
+
 
 /* ルーレット */
+
 #rouletteWrapper {
+
   position: relative;
+
   width: min(90vw, 400px);
+
   height: min(90vw, 400px);
+
     margin: 0 auto;
+
 }
+
+
 
 #rouletteCanvas {
+
   width: 100%;
+
   height: 100%;
+
   border: 1px solid #333;
+
   background: #fff;
+
   touch-action: manipulation; /* スクロール許可 */
 
+
+
 }
+
+
 
 /* 矢印 */
+
 #arrowWrapper {
+
   display: flex;
+
   justify-content: center;
+
   margin-bottom: 6px;
+
 }
+
 #arrow {
+
   width: 0;
+
   height: 0;
+
   border-left: 15px solid transparent;
+
   border-right: 15px solid transparent;
+
   border-top: 30px solid red;
+
 }
+
+
 
 /* 操作エリア */
+
 .controls {
+
   display: flex;
+
   flex-direction: column;
+
   gap: 10px;
+
   width: min(90vw, 460px);
+
   margin-top: 10px;
+
 }
+
+
 
 /* 各項目 */
+
 .item {
+
   display: flex;
+
   align-items: center; /* ←ズレ修正 */
+
   gap: 6px;
+
 }
+
+
 
 /* 操作グループ */
+
 .item-controls {
+
   display: flex;
+
   align-items: center;
+
   gap: 4px;
+
 }
+
+
 
 /* 要素名 */
+
 .item input[type="text"] {
+
   flex: 1;
+
   min-width: 0;
+
 }
+
+
 
 /* 角度 */
+
 .item input[type="number"] {
+
   width: 30px;
+
 }
+
+
 
 /* カラーピッカー */
+
 .item input[type="color"] {
+
   width: 32px;
+
   height: 28px;
+
   padding: 0;
+
   border: none;
+
 }
 
+
+
 /* 結果 */
+
 #result {
+
   font-size: 1.4em;
+
   font-weight: bold;
+
   margin-top: 10px;
+
   min-height: 3.6em;
+
 }
+
+
+
 
 
 @media (max-width: 600px) {
 
+
+
   /* 1項目を縦に分ける */
+
   .item {
+
     flex-direction: column;
+
     align-items: stretch;
+
     gap: 4px;
+
   }
+
+
 
   /* 名前入力は1段目で横いっぱい */
+
   .item input[type="text"] {
+
     width: 100%;
+
   }
+
+
 
   /* トグル＋名前を1行に */
+
   .item > .toggle,
+
   .item > input[type="text"] {
+
     flex-shrink: 0;
+
   }
+
+
 
   /* 操作グループは2段目 */
+
   .item-controls {
+
     display: flex;
+
     justify-content: space-between;
+
     gap: 4px;
+
   }
+
+
 
   /* 角度入力は少し広げる */
+
   .item input[type="number"] {
+
     width: 64px;
+
   }
+
 }
+
+
 
 /* number input の上下ボタンを消す */
+
 input[type="number"]::-webkit-inner-spin-button,
+
 input[type="number"]::-webkit-outer-spin-button {
+
   -webkit-appearance: none;
+
   margin: 0;
+
 }
+
+
 
 input[type="number"] {
+
   appearance: textfield; /* Firefox */
+
 }
+
+
 
 .container {
+
   width: min(90vw, 460px);
+
   margin: 0 auto;
+
 }
 
+
+
 </style>
+
 </head>
 
+
+
 <body>
+
   <div class="container">
+
 <a href="../"class="back-button">← トップページに戻る</a>
+
 <h1>カスタムルーレット ver.1.2.4</h1>
+
 <p>角度指定もできる、ちょっと多機能なカスタムルーレット</p>
 
+
+
 <div class="controls">
+
   <button id="resetBtn">ルーレット構成をデフォルトに戻す</button>
+
 </div>
+
+
 
 <div id="arrowWrapper"><div id="arrow"></div></div>
 
+
+
 <div id="rouletteWrapper">
+
   <canvas id="rouletteCanvas" width="400" height="400"></canvas>
+
 </div>
+
+
 
 <div id="result">結果: -</div>
 
+
+
 <div class="controls">
+
   <button id="startBtn">ルーレット開始</button>
+
   <button id="addItemBtn">項目を追加</button>
+
 </div>
+
+
 
 <div class="controls" id="itemsContainer"></div>
 
+
+
 <script>
+
 const canvas = document.getElementById('rouletteCanvas');
+
 const ctx = canvas.getContext('2d');
+
 const radius = canvas.width / 2;
+
 const resultDisplay = document.getElementById('result');
+
 const itemsContainer = document.getElementById('itemsContainer');
+
 let items = [];
+
 let longPressInterval = null;
 
+
+
 // --- ローカルストレージ復元 ---
+
 function loadItems() {
+
   const data = localStorage.getItem('rouletteItems');
+
   if(data){
+
     items = JSON.parse(data);
+
   } else {
+
     items = [
+
     { name:"イベントA", color:randomColor(), visible:true },
+
     { name:"イベントB", color:randomColor(), visible:true },
+
     { name:"イベントC", color:randomColor(), visible:true }
+
     ];
+
   }
+
 }
+
 loadItems();
+
 function saveItems(){ localStorage.setItem('rouletteItems', JSON.stringify(items)); }
 
+
+
 // --- ランダム色生成 ---
+
 function randomColor() {
+
   const h = Math.random() * 360;
+
   const s = 0.6 + Math.random() * 0.3;
+
   const l = 0.4 + Math.random() * 0.2;
 
+
+
   return hslToHex(h, s, l);
+
 }
+
+
 
 function hslToHex(h, s, l) {
+
   const a = s * Math.min(l, 1 - l);
 
+
+
   const f = n => {
+
     const k = (n + h / 30) % 12;
+
     const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+
     return Math.round(255 * color).toString(16).padStart(2, "0");
+
   };
 
+
+
   return `#${f(0)}${f(8)}${f(4)}`;
+
 }
+
+
 
 // --- UI描画 ---
+
 function renderItemsUI() {
+
   itemsContainer.innerHTML = "";
 
+
+
   items.forEach((item, index) => {
+
     const isHidden = item.visible === false;
 
+
+
     const div = document.createElement("div");
+
     div.className = "item";
 
+
+
     div.innerHTML = `
+
       <button class="toggle" data-index="${index}">
+
         ${isHidden ? "非表示" : "表示"}
+
       </button>
 
+
+
       <input type="text" data-index="${index}"
+
         value="${item.name}"
+
         ${isHidden ? "disabled" : ""}>
 
+
+
       <!-- ★ ここから操作グループ -->
+
       <div class="item-controls">
+
         <input type="number" data-index="${index}"
+
           value="${item.degree ?? ""}"
+
           placeholder="角度"
+
           ${isHidden ? "disabled" : ""}>
+
+
 
         <button class="dec" data-index="${index}" ${isHidden ? "disabled" : ""}>-</button>
+
         <button class="inc" data-index="${index}" ${isHidden ? "disabled" : ""}>+</button>
 
+
+
         <input type="color" data-index="${index}"
+
           value="${item.color}"
+
           ${isHidden ? "disabled" : ""}>
 
+
+
         <button class="del" data-index="${index}">削除</button>
+
       </div>
+
       <!-- ★ ここまで -->
+
     `;
 
+
+
     itemsContainer.appendChild(div);
+
   });
+
 }
+
+
+
 
 
 renderItemsUI();
 
+
+
 // --- UIイベント ---
+
 itemsContainer.addEventListener('input', e=>{
+
   const idx = e.target.dataset.index;
+
   if(e.target.type==='text') items[idx].name = e.target.value;
+
   if(e.target.type==='number'){
+
     let val = parseFloat(e.target.value);
+
     if(isNaN(val)) val = null;
+
     items[idx].degree = val;
+
     drawRoulette();
+
   }
+
   if(e.target.type==='color') {
+
     items[idx].color = e.target.value;
+
     drawRoulette();
+
   }
+
   saveItems();
+
 });
 
+
+
 // 角度入力確定時に 0〜360° に正規化
+
 itemsContainer.addEventListener('blur', e => {
+
   const idx = e.target.dataset.index;
+
+
 
   if (e.target.type === 'number') {
 
+
+
     const raw = e.target.value.trim();
 
+
+
     // ▼ 空欄 → 均等割り（null）
+
     if (raw === "") {
+
       items[idx].degree = null;
+
     } else {
+
       let val = parseFloat(raw);
 
+
+
       // ▼ マイナス・NaN → 0
+
       if (isNaN(val) || val < 0) val = 0;
 
+
+
       items[idx].degree = val;
+
     }
+
+
 
     // ▼ 上限360°（他項目考慮）
+
     const totalOther = items.reduce(
+
       (sum, i, ii) => sum + ((i.degree != null && ii != idx) ? i.degree : 0),
+
       0
+
     );
+
     const maxVal = Math.max(0, 360 - totalOther);
 
+
+
     if (items[idx].degree != null && items[idx].degree > maxVal) {
+
       items[idx].degree = maxVal;
+
     }
 
+
+
     renderItemsUI();
+
     attachAdjustEvents();
+
     drawRoulette();
+
     saveItems();
+
   }
+
+
 
   // 🔹 名前入力（追加）
+
   if(e.target.type === 'text'){
+
     drawRoulette();
+
     saveItems();
+
   }
+
 }, true);
 
+
+
 itemsContainer.addEventListener('keydown', e=>{
+
   if (e.target.type === 'text' && e.key === 'Enter') {
+
     e.preventDefault();
+
     e.target.blur();
+
   }
+
 });
+
+
+
 
 
 // --- 増減ボタン処理 ---
+
 function startAdjust(index, delta){
+
   if(longPressInterval) clearInterval(longPressInterval);
+
   function adjust(){
+
     const totalOther = items.reduce((sum,i,ii)=>sum+((i.degree!=null&&ii!=index)?i.degree:0),0);
+
     const maxVal = Math.max(0,360-totalOther);
+
     if(items[index].degree==null) items[index].degree=0;
+
     items[index].degree += delta;
+
     if(items[index].degree>maxVal) items[index].degree=maxVal;
+
     if(items[index].degree<0) items[index].degree=0;
+
     renderItemsUI();
+
     attachAdjustEvents();
+
     drawRoulette();
+
     saveItems();
+
   }
+
   adjust();
+
   longPressInterval = setInterval(adjust,100);
+
 }
+
 function stopAdjust(){ if(longPressInterval) clearInterval(longPressInterval); longPressInterval=null; }
+
+
 
 function attachAdjustEvents() {
 
+
+
 // ＋ボタン
+
 itemsContainer.querySelectorAll('.inc').forEach(btn => {
+
   const idx = parseInt(btn.dataset.index);
+
   const delta = 1;
 
+
+
   /* ========= PC（マウス） ========= */
+
   btn.onmousedown = () => {
+
     if (items[idx].visible === false) return;
+
     startAdjust(idx, delta);
+
   };
+
   btn.onmouseup =
+
   btn.onmouseleave = stopAdjust;
 
+
+
   /* ========= スマホ（タッチ） ========= */
+
   let startX, startY, moved, longPressTimer;
+
   const MOVE_THRESHOLD = 10;
+
   const LONG_PRESS_TIME = 300;
 
+
+
   btn.addEventListener('touchstart', e => {
+
     if (items[idx].visible === false) return;
 
+
+
     const t = e.touches[0];
+
     startX = t.clientX;
+
     startY = t.clientY;
+
     moved = false;
 
+
+
     longPressTimer = setTimeout(() => {
+
       if (!moved) {
+
         startAdjust(idx, delta); // 長押し開始
+
       }
+
     }, LONG_PRESS_TIME);
+
   });
+
+
 
   btn.addEventListener('touchmove', e => {
+
     const t = e.touches[0];
+
     if (
+
       Math.abs(t.clientX - startX) > MOVE_THRESHOLD ||
+
       Math.abs(t.clientY - startY) > MOVE_THRESHOLD
+
     ) {
+
       moved = true;
+
       clearTimeout(longPressTimer);
+
       stopAdjust(); // スワイプなのでキャンセル
+
     }
+
   });
+
+
 
   btn.addEventListener('touchend', () => {
+
     clearTimeout(longPressTimer);
 
+
+
     if (!moved) {
+
       // 短押し → 1回だけ
+
       startAdjust(idx, delta);
+
       stopAdjust();
+
     }
+
   });
+
 });
+
+
+
 
 
   // −ボタン
+
 itemsContainer.querySelectorAll('.dec').forEach(btn => {
+
   const idx = parseInt(btn.dataset.index);
+
   const delta = -1;
 
+
+
   /* ========= PC（マウス） ========= */
+
   btn.onmousedown = () => {
+
     if (items[idx].visible === false) return;
+
     startAdjust(idx, delta);
+
   };
+
   btn.onmouseup =
+
   btn.onmouseleave = stopAdjust;
 
+
+
   /* ========= スマホ（タッチ） ========= */
+
   let startX, startY, moved, longPressTimer;
+
   const MOVE_THRESHOLD = 10;
+
   const LONG_PRESS_TIME = 300;
 
+
+
   btn.addEventListener('touchstart', e => {
+
     if (items[idx].visible === false) return;
 
+
+
     const t = e.touches[0];
+
     startX = t.clientX;
+
     startY = t.clientY;
+
     moved = false;
 
+
+
     longPressTimer = setTimeout(() => {
+
       if (!moved) {
+
         startAdjust(idx, delta); // 長押し開始
+
       }
+
     }, LONG_PRESS_TIME);
+
   });
+
+
 
   btn.addEventListener('touchmove', e => {
+
     const t = e.touches[0];
+
     if (
+
       Math.abs(t.clientX - startX) > MOVE_THRESHOLD ||
+
       Math.abs(t.clientY - startY) > MOVE_THRESHOLD
+
     ) {
+
       moved = true;
+
       clearTimeout(longPressTimer);
+
       stopAdjust(); // スワイプなのでキャンセル
+
     }
+
   });
+
+
 
   btn.addEventListener('touchend', () => {
+
     clearTimeout(longPressTimer);
 
+
+
     if (!moved) {
+
       // 短押し → 1回だけ
+
       startAdjust(idx, delta);
+
       stopAdjust();
+
     }
+
   });
+
 });
 
+
+
   // 削除
+
   itemsContainer.querySelectorAll('.del').forEach(btn => {
+
     const idx = parseInt(btn.dataset.index);
+
     btn.onclick = () => {
+
       items.splice(idx, 1);
+
       redrawAll();
+
     };
+
   });
 
+
+
   // ★ 表示 / 非表示（復活）
+
   itemsContainer.querySelectorAll('.toggle').forEach(btn => {
+
     const idx = parseInt(btn.dataset.index);
+
     btn.onclick = () => {
+
       items[idx].visible = items[idx].visible === false;
+
       items[idx].degree = null; // 固定角度はリセット
+
       redrawAll();
+
     };
+
   });
+
 }
+
+
+
 
 
 attachAdjustEvents();
+
 function redrawAll() {
+
   renderItemsUI();
+
   attachAdjustEvents();
+
   drawRoulette();
+
   saveItems();
+
 }
+
+
 
 const MAX_FONT_SIZE = 28; // 短文時の最大
+
 const MIN_FONT_SIZE = 14; // 読める限界
+
 const PADDING = 10;       // 扇形内の余白
 
+
+
 // ルーレット内の要素名サイズ
+
 function calcFontSize(ctx, text, maxWidth) {
+
   let size = MAX_FONT_SIZE;
 
+
+
   while (size > MIN_FONT_SIZE) {
+
     ctx.font = `${size}px sans-serif`;
+
     if (ctx.measureText(text).width <= maxWidth) {
+
       return size;
+
     }
+
     size--;
+
   }
+
+
 
   return MIN_FONT_SIZE;
+
 }
+
+
 
 // ルーレット内の要素名が長い場合は文字列切り取る
+
 function trimText(ctx, text, maxWidth) {
+
   if (ctx.measureText(text).width <= maxWidth) return text;
 
+
+
   let trimmed = text;
+
   while (trimmed.length > 1) {
+
     trimmed = trimmed.slice(0, -1);
+
     if (ctx.measureText(trimmed + "…").width <= maxWidth) {
+
       return trimmed + "…";
+
     }
+
   }
+
   return text;
+
 }
+
+
+
+
+
 
 
 
 
 // --- ルーレット描画 ---
+
 let rotation = 0;
+
 function drawRoulette(rot = rotation){
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+
+
   // ★ 表示中の要素だけ使う
+
   const visibleItems = items.filter(i => i.visible !== false);
+
   if (visibleItems.length === 0) return;
 
+
+
   // 固定角度は「表示中のみ」で計算
+
   const totalFixed = visibleItems.reduce((sum, i) => sum + (i.degree ?? 0), 0);
+
   const remaining = Math.max(0, 360 - totalFixed);
 
+
+
   const unfixedItems = visibleItems.filter(i => i.degree == null);
+
   const unit = unfixedItems.length ? remaining / unfixedItems.length : 0;
+
+
 
   let startAngle = -Math.PI / 2 + rot;
 
+
+
   for (let item of visibleItems) {
+
     const deg = item.degree ?? unit;
+
       if (deg <= 0) continue;
+
     const rad = deg * Math.PI / 180;
 
+
+
     ctx.beginPath();
+
     ctx.moveTo(radius, radius);
+
     ctx.arc(radius, radius, radius, startAngle, startAngle + rad);
+
     ctx.fillStyle = item.color;
+
     ctx.fill();
+
     ctx.strokeStyle = "#000";
+
     ctx.stroke();
 
+
+
     ctx.save();
+
     ctx.translate(radius, radius);
+
     ctx.rotate(startAngle + rad / 2);
+
     ctx.textAlign = 'right';
+
     ctx.fillStyle = '#000';
+
+
 
     const maxTextWidth = radius - PADDING * 2;
 
+
+
     // フォントサイズ計算
+
     const fontSize = calcFontSize(ctx, item.name, maxTextWidth);
+
     ctx.font = `${fontSize}px sans-serif`;
 
+
+
     // 表示文字（必要なら省略）
+
     let drawText = item.name;
+
     if (fontSize === MIN_FONT_SIZE) {
+
     drawText = trimText(ctx, item.name, maxTextWidth);
+
     }
+
+
 
     ctx.fillText(drawText, radius - PADDING, 0);
 
+
+
     ctx.restore();
 
+
+
     startAngle += rad;
+
   }
+
 }
+
+
+
 
 
 // --- 上方向にあるセクション判定 ---
+
 function getCurrentItem(rot){
+
   // ★ 表示中のみ
+
   const visibleItems = items.filter(i => i.visible !== false);
+
   if (visibleItems.length === 0) return null;
 
+
+
   const totalFixed = visibleItems.reduce((sum,i)=>sum+(i.degree??0),0);
+
   const remaining = Math.max(0,360-totalFixed);
 
+
+
   const unfixedItems = visibleItems.filter(i=>i.degree==null);
+
   const unit = unfixedItems.length ? remaining/unfixedItems.length : 0;
 
+
+
   // 上方向（矢印）基準
+
   const deg = (360 - (rot * 180 / Math.PI) % 360 + 360) % 360;
 
+
+
   let cumulative = 0;
+
   for(let item of visibleItems){
+
     cumulative += item.degree ?? unit;
+
     if(deg <= cumulative) return item.name;
+
   }
+
   return null;
+
 }
+
+
+
 
 
 // --- ルーレット回転 ---
+
 let spinning=false;
+
 function startRoulette(){
+
   if(spinning) return;
+
   const totalFixed = items.reduce((sum,i)=>sum+(i.degree??0),0);
+
   if(totalFixed>360){ alert("固定角度合計が360°を超えています"); return; }
 
+
+
   spinning=true;
+
   const targetAngle = Math.random()*360;
+
   const spins = 3 + Math.random()*2;
+
   const duration = 4000;
+
   const startTime = performance.now();
+
   const startRot = rotation;
+
   const endRot = rotation + spins*2*Math.PI + targetAngle*Math.PI/180;
 
+
+
   function animate(time){
+
     const t = Math.min((time-startTime)/duration,1);
+
     rotation = startRot + (endRot-startRot)*(1-Math.pow(1-t,3));
+
     drawRoulette(rotation);
+
     resultDisplay.textContent = "現在: "+getCurrentItem(rotation);
+
     if(t<1) requestAnimationFrame(animate);
+
     else { spinning=false; resultDisplay.textContent="結果: "+getCurrentItem(rotation); saveItems(); }
+
   }
+
   requestAnimationFrame(animate);
+
 }
+
+
 
 function resetItems(){
+
   if(!confirm("本当にデフォルト状態に戻しますか？\n現在のデータは上書きされます。")) return;
 
+
+
   items = [
+
     { name:"イベントA", color:randomColor(), visible:true },
+
     { name:"イベントB", color:randomColor(), visible:true },
+
     { name:"イベントC", color:randomColor(), visible:true }
+
   ];
+
   drawRoulette();
+
   renderItemsUI();
+
   attachAdjustEvents();
+
   saveItems();
+
 }
+
 // リセット
+
 document.getElementById('resetBtn')
+
   .addEventListener('click', resetItems);
 
+
+
 // ルーレット開始（ボタン）
+
 document.getElementById('startBtn')
+
   .addEventListener('click', startRoulette);
 
+
+
 // ルーレット開始（キャンバス：PC & タップ兼用）
+
 canvas.addEventListener('click', startRoulette);
 
+
+
 // 項目追加
+
 document.getElementById('addItemBtn')
+
   .addEventListener('click', () => {
+
     items.push({
+
       name: "新規項目",
+
       degree: null,
+
       color: randomColor(),
+
       visible: true
+
     });
+
     redrawAll();
+
   });
 
+
+
 // 初期描画
+
 drawRoulette();
 
+
+
 </script>
+
 <script data-goatcounter="https://kb-mugai.goatcounter.com/count"
+
         async src="//gc.zgo.at/count.js"></script>
+
   </div>
+
 </body>
+
 </html>
