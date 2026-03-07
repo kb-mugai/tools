@@ -2,25 +2,25 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Gravity Heart Tunnel</title>
+<title>Perfect Smooth Heart Tunnel</title>
 <style>
 body, html {
-margin:0; padding:0; width:100%; height:100%;
-overflow:hidden; background:#000;
+    margin:0; padding:0; width:100%; height:100%;
+    overflow:hidden; background:#000;
 }
 canvas { display:block; }
-/* iOS対策の許可ボタン */
 #permission-btn {
-position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-padding: 15px 30px; font-size: 18px; background: #ff1493; color: white;
-border: none; border-radius: 30px; cursor: pointer; z-index: 100;
-display: none; box-shadow: 0 0 20px rgba(255,20,147,0.5);
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    padding: 15px 30px; font-size: 18px; background: #ff1493; color: white;
+    border: none; border-radius: 30px; cursor: pointer; z-index: 100;
+    display: none; box-shadow: 0 0 20px rgba(255,20,147,0.5);
+    font-family: sans-serif;
 }
 </style>
 </head>
-
 <body>
-<button id="permission-btn">センサーを有効にして開始</button>
+
+<button id="permission-btn">タップしてセンサーを有効にする</button>
 <canvas id="canvas"></canvas>
 
 <script>
@@ -30,7 +30,11 @@ const btn = document.getElementById('permission-btn');
 
 let width, height;
 let rings = [];
-let rotationAngle = 0; // ハートの回転角（ラジアン）
+
+// --- ジャイロ制御用の変数 ---
+let targetRotation = 0;   // センサーが示す目標角度
+let currentRotation = 0;  // 実際に描画で使う滑らかな角度
+const lerpFactor = 0.15;  // 追従の滑らかさ (0.05〜0.2の間で調整)
 
 const config = {
     spawnInterval: 300,
@@ -50,20 +54,18 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// --- ジャイロセンサーの処理 ---
+// センサーイベントハンドラ
 function handleOrientation(event) {
-    // 角度（度）をラジアンに変換
-    // beta: 前後の傾き, gamma: 左右の傾き
-    const x = event.gamma; 
-    const y = event.beta;
+    const x = event.gamma; // 左右の傾き
+    const y = event.beta;  // 前後の傾き
     
-    // スマホを立てて持っている状態を基準に、重力方向の角度を計算
     if (x !== null && y !== null) {
-        rotationAngle = Math.atan2(x, y);
+        // 重力方向の計算
+        targetRotation = Math.atan2(x, y);
     }
 }
 
-// iOS 13+ のための権限リクエスト
+// 権限リクエスト
 function requestPermission() {
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission()
@@ -80,7 +82,6 @@ function requestPermission() {
     }
 }
 
-// 権限が必要なブラウザ（主にiOS）ならボタンを表示
 if (typeof DeviceOrientationEvent.requestPermission === 'function') {
     btn.style.display = 'block';
     btn.onclick = requestPermission;
@@ -94,18 +95,20 @@ class Ring {
         this.scale = 0;
         this.opacity = 1;
     }
+
     update(now) {
         const elapsed = now - this.startTime;
         this.scale = Math.pow(elapsed * config.expandSpeed, 2.2);
         if (this.scale > 7) this.opacity -= 0.05;
     }
+
     draw() {
         if (this.scale < 0.1 || this.opacity <= 0) return;
         ctx.save();
         ctx.translate(width / 2, height / 2);
         
-        // ★回転を追加（重力方向が下になるように）
-        ctx.rotate(-rotationAngle);
+        // 滑らかな角度を適用（逆回転させて向きを固定）
+        ctx.rotate(-currentRotation);
         
         const s = this.scale * 15;
         ctx.scale(s, s);
@@ -124,14 +127,24 @@ let lastSpawn = 0;
 
 function loop() {
     const now = Date.now();
+
+    // --- 角度の最短経路補間 (Lerp) ---
+    let diff = targetRotation - currentRotation;
+    // 180度を超えて回転しないように補正
+    if (diff > Math.PI) diff -= Math.PI * 2;
+    if (diff < -Math.PI) diff += Math.PI * 2;
+    currentRotation += diff * lerpFactor;
+
     const t = now * 0.001;
     const glow = 10 + Math.sin(t * 0.8) * 5;
 
+    // 背景描画
     ctx.globalAlpha = 0.85;
     ctx.fillStyle = `hsl(330, 100%, ${45 + glow}%)`;
     ctx.fillRect(0, 0, width, height);
     ctx.globalAlpha = 1;
 
+    // リング生成と描画
     if (now - lastSpawn > config.spawnInterval) {
         rings.push(new Ring());
         lastSpawn = now;
@@ -153,10 +166,7 @@ function loop() {
     // 中心の鼓動ハート
     ctx.save();
     ctx.translate(width / 2, height / 2);
-    
-    // ★回転を追加
-    ctx.rotate(-rotationAngle);
-    
+    ctx.rotate(-currentRotation); // 滑らかな角度を適用
     const beat = Math.sin(now / 1000 * Math.PI * 2 * (115 / 60));
     const pulse = 2.5 + (beat > 0 ? Math.pow(beat, 2) * 0.5 : 0);
     ctx.scale(pulse, pulse);
