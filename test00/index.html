@@ -3,75 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>360° Stream Radar - Stable</title>
+    <title>360° Live Radar v1.0</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: manipulation; }
         
-        /* 全画面に重ねるコンテナ */
-        #viewer-paints {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-        }
+        /* 動画表示エリア（全画面重ね） */
+        #viewer-paints { position: relative; width: 100vw; height: 100vh; }
         .video-wrapper {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 100vw;
-            height: 56.25vw; /* 16:9 */
-            opacity: 0.01; /* スリープ防止のため完全には消さない */
-            transition: opacity 0.2s ease-out;
-            pointer-events: none;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 100vw; height: 56.25vw; visibility: hidden; opacity: 0;
+            transition: opacity 0.3s ease; pointer-events: none;
         }
         iframe { width: 100%; height: 100%; border: none; }
 
         /* レーダーUI */
         #radar-container {
-            position: fixed; bottom: 20px; left: 50%;
-            transform: translateX(-50%);
-            width: 120px; height: 120px;
-            border-radius: 50%; border: 2px solid #0f0;
-            background: rgba(0, 40, 0, 0.4);
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            width: 130px; height: 130px; border-radius: 50%; border: 2px solid #00ff96;
+            background: rgba(0, 40, 20, 0.6); box-shadow: 0 0 15px rgba(0,255,150,0.3);
         }
         .radar-dot {
-            position: absolute; width: 8px; height: 8px;
-            background: #fff; border-radius: 50%;
-            top: 50%; left: 50%; transform-origin: 0 -55px;
+            position: absolute; width: 10px; height: 10px; background: #fff;
+            border-radius: 50%; top: 50%; left: 50%; transform-origin: 0 -55px;
         }
+        #center-marker { position: absolute; top: 0; left: 50%; width: 2px; height: 15px; background: #ff4500; }
 
         /* 設定パネル */
         #settings {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 100; padding: 20px; box-sizing: border-box;
+            background: rgba(0,0,0,0.95); z-index: 100; padding: 20px; box-sizing: border-box; overflow-y: auto;
         }
-        input { width: 100%; margin-bottom: 10px; padding: 10px; background: #222; color: #fff; border: 1px solid #444; }
-        button { width: 100%; padding: 20px; background: #28a745; color: #fff; border: none; font-weight: bold; }
+        .input-group { margin-bottom: 20px; padding: 10px; border: 1px solid #333; border-radius: 8px; }
+        input { width: 100%; margin-top: 5px; padding: 12px; background: #111; color: #fff; border: 1px solid #555; box-sizing: border-box; }
+        button#start-btn { width: 100%; padding: 20px; background: #00ff96; color: #000; border: none; font-size: 1.2rem; font-weight: bold; border-radius: 10px; cursor: pointer; }
+        #info { font-size: 0.8rem; color: #888; text-align: center; margin-top: 10px; }
     </style>
 </head>
 <body>
 
 <div id="settings">
-    <h2>📡 配信配置設定</h2>
-    <div>
-        URL 1: <input type="text" class="v-url" value="https://www.youtube.com/watch?v=letYicNyuJw">
-        角度: <input type="number" class="v-angle" value="0">
+    <h2 style="color:#00ff96">📡 Stream Radar</h2>
+    <div id="inputs-container">
+        <div class="input-group">
+            URL 1 (正面): <input type="text" class="v-url" value="https://www.youtube.com/watch?v=5CRosk_4u3E">
+            角度: <input type="number" class="v-angle" value="0">
+        </div>
+        <div class="input-group">
+            URL 2 (右): <input type="text" class="v-url" value="https://www.youtube.com/watch?v=apwfffh40Yw">
+            角度: <input type="number" class="v-angle" value="30">
+        </div>
     </div>
-    <div>
-        URL 2: <input type="text" class="v-url" value="https://www.youtube.com/watch?v=apwfffh40Yw">
-        角度: <input type="number" class="v-angle" value="30">
-    </div>
-    <button onclick="startApp()">センサーを有効化して開始</button>
+    <button id="start-btn" onclick="startApp()">START & SYNC</button>
+    <p id="info">※画面ダブルタップで正面をリセット<br>※20°〜40°刻みがおすすめです</p>
 </div>
 
 <div id="viewer-paints"></div>
-<div id="radar-container"><div id="center-line" style="position:absolute; top:0; left:50%; width:2px; height:15px; background:red;"></div></div>
+<div id="radar-container"><div id="center-marker"></div></div>
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 let players = [];
 let videoData = [];
 let baseHeading = null;
+let isStarted = false;
 
+// 1. YouTube ID抽出
+function extractID(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
+
+// 2. アプリ開始
 function startApp() {
     const urls = document.querySelectorAll('.v-url');
     const angles = document.querySelectorAll('.v-angle');
@@ -95,41 +98,41 @@ function startApp() {
         
         players[i] = new YT.Player(`player-${i}`, {
             videoId: data.id,
-            playerVars: { 'autoplay': 1, 'mute': 1, 'controls': 0, 'playsinline': 1 },
+            playerVars: { 'autoplay': 1, 'mute': 1, 'controls': 0, 'playsinline': 1, 'rel': 0 },
             events: {
                 'onReady': (e) => {
-                    e.target.setPlaybackQuality('small'); // 負荷軽減
+                    e.target.setPlaybackQuality('small'); 
                     e.target.playVideo();
+                    // ライブの最新位置へ強制シーク（安定化のため）
+                    setTimeout(() => { if(e.target.seekTo) e.target.seekTo(e.target.getDuration(), true); }, 2000);
                 }
             }
         });
 
         const dot = document.createElement('div');
         dot.className = 'radar-dot';
+        dot.id = `dot-${i}`;
         dot.style.transform = `translate(-50%, -50%) rotate(${data.angle}deg)`;
         document.getElementById('radar-container').appendChild(dot);
     });
 
+    // センサー許可 (iOS)
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         DeviceOrientationEvent.requestPermission().then(res => { if (res === 'granted') initSensor(); });
     } else { initSensor(); }
     
     document.getElementById('settings').style.display = 'none';
+    isStarted = true;
 }
 
-function extractID(url) {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-}
-
+// 3. センサー & 更新ロジック
 function initSensor() {
     window.addEventListener('deviceorientation', (e) => {
+        if (!isStarted) return;
         let heading = e.webkitCompassHeading || (360 - e.alpha);
         if (baseHeading === null) baseHeading = heading;
         
         let relativeHeading = heading - baseHeading;
-        // 角度の正規化 (-180 to 180)
         if (relativeHeading > 180) relativeHeading -= 360;
         if (relativeHeading < -180) relativeHeading += 360;
 
@@ -137,22 +140,38 @@ function initSensor() {
             let diff = Math.abs(relativeHeading - data.angle);
             if (diff > 180) diff = 360 - diff;
 
-            // 視覚的な重なり（30度以内でクロスフェード）
-            let opacity = Math.max(0.01, 1 - (diff / 30));
-            document.getElementById(`wrapper-${i}`).style.opacity = opacity;
+            const wrapper = document.getElementById(`wrapper-${i}`);
+            const dot = document.getElementById(`dot-${i}`);
+            
+            // 映像スイッチング (15度以内なら表示)
+            if (diff < 15) {
+                wrapper.style.visibility = 'visible';
+                wrapper.style.opacity = 1;
+                dot.style.background = '#00ff96'; // レーダー上の現在地を強調
+            } else {
+                wrapper.style.visibility = 'hidden';
+                wrapper.style.opacity = 0;
+                dot.style.background = '#fff';
+            }
 
-            // 音量制御
+            // 音声制御 (25度離れると消音)
             if (players[i] && players[i].setVolume) {
-                let vol = Math.max(0, 100 - (diff * 4)); // 25度離れると無音
+                let vol = Math.max(0, 100 - (diff * 4)); 
                 players[i].setVolume(vol);
                 if (vol > 0) players[i].unMute(); else players[i].mute();
             }
         });
 
-        // レーダーの回転
+        // レーダー回転
         document.getElementById('radar-container').style.transform = `translateX(-50%) rotate(${-relativeHeading}deg)`;
     });
 }
+
+// 4. リセット機能 (ダブルタップ)
+window.addEventListener('dblclick', () => {
+    baseHeading = null;
+    console.log("Center Reset");
+});
 </script>
 </body>
 </html>
