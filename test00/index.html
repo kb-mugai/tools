@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>360° Stream Radar</title>
+    <style>
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
+        
+        /* 動画を横に並べるコンテナ */
+        #viewer-paints {
+            display: flex;
+            height: 100vh;
+            align-items: center;
+            transition: transform 0.1s ease-out;
+            will-change: transform;
+        }
+        .video-slot {
+            min-width: 100vw;
+            height: 56.25vw; /* 16:9 */
+            display: flex;
+            justify-content: center;
+            background: #111;
+            position: relative;
+        }
+        iframe { border: none; width: 90%; height: 100%; pointer-events: none; }
+
+        /* レーダーUI */
+        #radar-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 255, 150, 0.5);
+            background: rgba(0, 20, 0, 0.5);
+        }
+        .radar-dot {
+            position: absolute;
+            width: 10px; height: 10px;
+            background: #0f0; border-radius: 50%;
+            top: 50%; left: 50%;
+            transform-origin: 0 -75px; /* 半径に合わせて調整 */
+        }
+        #center-line {
+            position: absolute;
+            top: 0; left: 50%; width: 2px; height: 20px;
+            background: red;
+        }
+
+        /* 設定パネル */
+        #settings {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 100;
+            padding: 20px; box-sizing: border-box; overflow-y: auto;
+        }
+        input { width: 100%; margin-bottom: 10px; padding: 8px; }
+        button { width: 100%; padding: 15px; background: #007bff; color: #fff; border: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="settings">
+    <h2>📡 配信配置設定</h2>
+    <div id="inputs">
+        <div>
+            URL 1: <input type="text" class="v-url" value="https://www.youtube.com/watch?v=5qap5aO4i9A">
+            角度: <input type="number" class="v-angle" value="0">
+        </div>
+        <div>
+            URL 2: <input type="text" class="v-url" value="https://www.youtube.com/watch?v=jfKfPfyJRdk">
+            角度: <input type="number" class="v-angle" value="30">
+        </div>
+    </div>
+    <p>※20°〜30°刻みが推奨です</p>
+    <button onclick="startApp()">センサー有効化 ＆ 開始</button>
+</div>
+
+<div id="viewer-paints"></div>
+
+<div id="radar-container">
+    <div id="center-line"></div>
+    </div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+let players = [];
+let baseHeading = 0;
+let videoData = [];
+
+function startApp() {
+    // 1. 設定の取得
+    const urls = document.querySelectorAll('.v-url');
+    const angles = document.querySelectorAll('.v-angle');
+    
+    videoData = Array.from(urls).map((el, i) => ({
+        id: extractID(el.value),
+        angle: parseFloat(angles[i].value)
+    }));
+
+    // 2. プレイヤー生成
+    const container = document.getElementById('viewer-paints');
+    container.innerHTML = '';
+    videoData.forEach((data, i) => {
+        const slot = document.createElement('div');
+        slot.className = 'video-slot';
+        slot.id = `player-${i}`;
+        container.appendChild(slot);
+        
+        players[i] = new YT.Player(`player-${i}`, {
+            videoId: data.id,
+            playerVars: { 'autoplay': 1, 'mute': 1, 'controls': 0 },
+            events: { 'onReady': (e) => e.target.playVideo() }
+        });
+
+        // レーダードット追加
+        const dot = document.createElement('div');
+        dot.className = 'radar-dot';
+        dot.style.transform = `translate(-50%, -50%) rotate(${data.angle}deg)`;
+        document.getElementById('radar-container').appendChild(dot);
+    });
+
+    // 3. センサー有効化（iOS対策）
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        DeviceOrientationEvent.requestPermission().then(res => {
+            if (res === 'granted') initSensor();
+        });
+    } else {
+        initSensor();
+    }
+    
+    document.getElementById('settings').style.display = 'none';
+}
+
+function extractID(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
+
+function initSensor() {
+    window.addEventListener('deviceorientation', (e) => {
+        let heading = e.webkitCompassHeading || (360 - e.alpha);
+        if (baseHeading === 0) baseHeading = heading; // 最初の向きを0とする
+        
+        let relativeHeading = heading - baseHeading;
+        
+        // 1. 画面のスライド (角度をピクセルに変換)
+        // 1度あたり 5vw 動かすような計算（調整可能）
+        const offset = relativeHeading * -5;
+        document.getElementById('viewer-paints').style.transform = `translateX(${offset}vw)`;
+
+        // 2. 音量とパンニングの制御（簡易版）
+        videoData.forEach((data, i) => {
+            let diff = Math.abs(relativeHeading - data.angle);
+            if (diff > 180) diff = 360 - diff;
+            
+            // 20度離れたら音量0にする減衰
+            let vol = Math.max(0, 100 - (diff * 5)); 
+            if (players[i] && players[i].setVolume) {
+                players[i].setVolume(vol);
+                if (vol > 0) players[i].unMute(); else players[i].mute();
+            }
+        });
+
+        // 3. レーダー自体の回転
+        document.getElementById('radar-container').style.transform = `translateX(-50%) rotate(${-relativeHeading}deg)`;
+    });
+}
+</script>
+</body>
+</html>
