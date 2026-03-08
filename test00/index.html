@@ -75,7 +75,7 @@ function extractID(url) {
 }
 
 // 2. アプリ開始
-function startApp() {
+async function startApp() {
     const urls = document.querySelectorAll('.v-url');
     const angles = document.querySelectorAll('.v-angle');
     
@@ -87,7 +87,9 @@ function startApp() {
     const container = document.getElementById('viewer-paints');
     container.innerHTML = '';
 
-    videoData.forEach((data, i) => {
+    // 🌟 逐次初期化 (async/awaitで1つずつ順番に生成)
+    for (let i = 0; i < videoData.length; i++) {
+        const data = videoData[i];
         const wrapper = document.createElement('div');
         wrapper.className = 'video-wrapper';
         wrapper.id = `wrapper-${i}`;
@@ -96,15 +98,26 @@ function startApp() {
         wrapper.appendChild(playerDiv);
         container.appendChild(wrapper);
         
+        // わずかな遅延を挟んでブラウザのパンクを防ぐ
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         players[i] = new YT.Player(`player-${i}`, {
             videoId: data.id,
-            playerVars: { 'autoplay': 1, 'mute': 1, 'controls': 0, 'playsinline': 1, 'rel': 0 },
+            playerVars: { 
+                'autoplay': (Math.abs(data.angle) < 15) ? 1 : 0, // 🌟 正面以外は最初は自動再生させない
+                'mute': 1, 
+                'controls': 0, 
+                'playsinline': 1, 
+                'rel': 0 
+            },
             events: {
                 'onReady': (e) => {
                     e.target.setPlaybackQuality('small'); 
-                    e.target.playVideo();
-                    // ライブの最新位置へ強制シーク（安定化のため）
-                    setTimeout(() => { if(e.target.seekTo) e.target.seekTo(e.target.getDuration(), true); }, 2000);
+                    // 🌟 正面に近い場合のみ、即座にミュート解除して再生
+                    if (Math.abs(data.angle) < 15) {
+                        e.target.playVideo();
+                        e.target.unMute();
+                    }
                 }
             }
         });
@@ -114,12 +127,15 @@ function startApp() {
         dot.id = `dot-${i}`;
         dot.style.transform = `translate(-50%, -50%) rotate(${data.angle}deg)`;
         document.getElementById('radar-container').appendChild(dot);
-    });
+    }
 
     // センサー許可 (iOS)
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        DeviceOrientationEvent.requestPermission().then(res => { if (res === 'granted') initSensor(); });
-    } else { initSensor(); }
+        const res = await DeviceOrientationEvent.requestPermission();
+        if (res === 'granted') initSensor();
+    } else { 
+        initSensor(); 
+    }
     
     document.getElementById('settings').style.display = 'none';
     isStarted = true;
