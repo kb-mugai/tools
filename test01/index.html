@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>PC Live Multi-Zapper</title>
+    <style>
+        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
+        #setup { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; padding: 40px; }
+        input { width: 400px; padding: 10px; margin: 5px; display: block; background: #222; color: #fff; border: 1px solid #444; }
+        button { padding: 20px 40px; background: #00ff96; border: none; font-weight: bold; cursor: pointer; margin-top: 20px; }
+
+        /* 動画を重ねて配置 */
+        .stage { position: relative; width: 100vw; height: 100vh; }
+        .v-frame {
+            position: absolute; inset: 0;
+            opacity: 0.01; /* 0にすると止まるので0.01 */
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .v-frame.active { opacity: 1; pointer-events: auto; }
+        iframe { width: 100%; height: 100%; }
+
+        #nav { position: fixed; bottom: 20px; width: 100%; text-align: center; }
+    </style>
+</head>
+<body>
+
+<div id="setup">
+    <h2>📡 PCザッピング・セットアップ</h2>
+    <div id="url-inputs">
+        <input type="text" class="url" value="https://www.youtube.com/watch?v=jfKfPfyJRdk">
+        <input type="text" class="url" value="https://www.youtube.com/watch?v=5qap5aO4i9A">
+        <input type="text" class="url" value="https://www.youtube.com/watch?v=5vhpWvS_Msc">
+        <input type="text" class="url" value="https://www.youtube.com/watch?v=L_LUpnjLp8M">
+    </div>
+    <button onclick="boot()">全ライブを同期・開始</button>
+</div>
+
+<div class="stage" id="stage"></div>
+<div id="nav">← Aキー / Dキー でザッピング →</div>
+
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+    let players = [];
+    let currentIndex = 0;
+
+    function extractID(url) {
+        const match = url.match(/(?:v=|\/)([0-9A-Za-z_-]{11})/);
+        return match ? match[1] : null;
+    }
+
+    async function boot() {
+        const urls = document.querySelectorAll('.url');
+        const ids = Array.from(urls).map(el => extractID(el.value)).filter(id => id);
+        const stage = document.getElementById('stage');
+
+        for (let i = 0; i < ids.length; i++) {
+            const div = document.createElement('div');
+            div.className = 'v-frame';
+            div.id = `wrap-${i}`;
+            div.innerHTML = `<div id="p-${i}"></div>`;
+            stage.appendChild(div);
+
+            // 1つずつ丁寧に初期化
+            await new Promise(resolve => {
+                players[i] = new YT.Player(`p-${i}`, {
+                    videoId: ids[i],
+                    playerVars: { 'autoplay': 1, 'mute': 1, 'controls': 1, 'rel': 0 },
+                    events: {
+                        'onReady': (e) => {
+                            e.target.playVideo();
+                            resolve();
+                        }
+                    }
+                });
+            });
+            // 少し待機してデコーダーを安定させる
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        document.getElementById('setup').style.display = 'none';
+        updateView();
+    }
+
+    function updateView() {
+        players.forEach((p, i) => {
+            const wrap = document.getElementById(`wrap-${i}`);
+            if (i === currentIndex) {
+                wrap.classList.add('active');
+                p.unMute();
+                p.setVolume(100);
+            } else {
+                wrap.classList.remove('active');
+                p.mute(); // 音だけ消して再生は維持
+            }
+        });
+    }
+
+    // キーボード操作
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'd' || e.key === 'ArrowRight') {
+            currentIndex = (currentIndex + 1) % players.length;
+            updateView();
+        }
+        if (e.key === 'a' || e.key === 'ArrowLeft') {
+            currentIndex = (currentIndex - 1 + players.length) % players.length;
+            updateView();
+        }
+    });
+</script>
+</body>
+</html>
