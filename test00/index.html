@@ -2,192 +2,152 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>360° Live Radar v1.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Rare Card Maker</title>
     <style>
-        body { margin: 0; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: manipulation; }
+        :root { --x: 50%; --y: 50%; --intensity: 0; }
+        body { background: #050505; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; color: white; overflow: hidden; }
         
-        /* 動画表示エリア（全画面重ね） */
-        #viewer-paints { position: relative; width: 100vw; height: 100vh; }
-        .video-wrapper {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 100vw; height: 56.25vw; visibility: hidden; opacity: 0;
-            transition: opacity 0.3s ease; pointer-events: none;
+        /* カードコンテナ（外枠：金枠） */
+        .card-container {
+            position: relative;
+            width: 310px;
+            height: 440px;
+            border-radius: 16px;
+            /* しっかりした金枠（border-imageを使用） */
+            border: 12px solid;
+            border-image: linear-gradient(135deg, #b8860b, #ffd700, #fff8dc, #ffd700, #b8860b) 1;
+            /* 枠の光沢移動 */
+            background: linear-gradient(calc(var(--y) * 3.6), transparent, rgba(255,255,200,0.6), transparent);
+            background-size: 100% 200%;
+            background-position: 0 var(--y);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.8), 0 0 30px rgba(255,215,0,0.3);
+            overflow: hidden;
+            transition: background-position 0.1s ease-out;
         }
-        iframe { width: 100%; height: 100%; border: none; }
 
-        /* レーダーUI */
-        #radar-container {
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-            width: 130px; height: 130px; border-radius: 50%; border: 2px solid #00ff96;
-            background: rgba(0, 40, 20, 0.6); box-shadow: 0 0 15px rgba(0,255,150,0.3);
+        /* 写真エリア */
+        .photo-area {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #111;
+            overflow: hidden;
         }
-        .radar-dot {
-            position: absolute; width: 10px; height: 10px; background: #fff;
-            border-radius: 50%; top: 50%; left: 50%; transform-origin: 0 -55px;
-        }
-        #center-marker { position: absolute; top: 0; left: 50%; width: 2px; height: 15px; background: #ff4500; }
 
-        /* 設定パネル */
-        #settings {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 100; padding: 20px; box-sizing: border-box; overflow-y: auto;
+        .photo-area img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* レイヤー1: 虹色ホロ（斜めのツヤ感）※前回の方式を復元 */
+        .hologram {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            mix-blend-mode: color-dodge;
+            opacity: calc(0.4 + var(--intensity) * 0.3);
+            background: linear-gradient(115deg, 
+                transparent 15%, 
+                rgba(255,100,100,0.5) 30%, 
+                rgba(255,255,100,0.5) 40%, 
+                rgba(100,255,255,0.5) 50%, 
+                rgba(100,100,255,0.5) 60%, 
+                transparent 85%
+            );
+            background-size: 200% 200%;
+            background-position: var(--x) var(--y);
+            pointer-events: none;
         }
-        .input-group { margin-bottom: 20px; padding: 10px; border: 1px solid #333; border-radius: 8px; }
-        input { width: 100%; margin-top: 5px; padding: 12px; background: #111; color: #fff; border: 1px solid #555; box-sizing: border-box; }
-        button#start-btn { width: 100%; padding: 20px; background: #00ff96; color: #000; border: none; font-size: 1.2rem; font-weight: bold; border-radius: 10px; cursor: pointer; }
-        #info { font-size: 0.8rem; color: #888; text-align: center; margin-top: 10px; }
+
+        /* レイヤー2: ラメ（粒感を強化） */
+        .glitter {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            mix-blend-mode: screen;
+            opacity: calc(0.3 + var(--intensity) * 0.7); /* 傾けるとギラッと光る */
+            background-image: 
+                /* 粒を大きく、パキッと */
+                radial-gradient(circle, #fff 1.5px, transparent 1.5px),
+                radial-gradient(circle, #ffd700 1.8px, transparent 1.8px),
+                radial-gradient(circle, #fff 1px, transparent 1px);
+            background-size: 30px 30px, 50px 50px, 70px 70px;
+            /* 上下左右で複雑に動かす */
+            background-position: calc(var(--x) * 0.1) calc(var(--y) * 0.1), calc(var(--x) * -0.1) calc(var(--y) * -0.1), calc(var(--x) * 0.2) calc(var(--y) * -0.2);
+            pointer-events: none;
+        }
+
+        .controls { margin-top: 30px; display: flex; gap: 15px; z-index: 10; }
+        input[type="file"] { display: none; }
+        .btn { background: linear-gradient(#fff, #ccc); color: #111; padding: 12px 24px; border-radius: 30px; cursor: pointer; font-weight: bold; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-size: 14px; }
     </style>
 </head>
 <body>
 
-<div id="settings">
-    <h2 style="color:#00ff96">📡 Stream Radar</h2>
-    <div id="inputs-container">
-        <div class="input-group">
-            URL 1 (正面): <input type="text" class="v-url" value="https://www.youtube.com/watch?v=5CRosk_4u3E">
-            角度: <input type="number" class="v-angle" value="0">
-        </div>
-        <div class="input-group">
-            URL 2 (右): <input type="text" class="v-url" value="https://www.youtube.com/watch?v=apwfffh40Yw">
-            角度: <input type="number" class="v-angle" value="30">
+    <div class="card-container">
+        <div class="photo-area">
+            <img id="preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%231a1a1a'/%3E%3C/svg%3E">
+            <div class="hologram"></div>
+            <div class="glitter"></div>
         </div>
     </div>
-    <button id="start-btn" onclick="startApp()">START & SYNC</button>
-    <p id="info">※画面ダブルタップで正面をリセット<br>※20°〜40°刻みがおすすめです</p>
-</div>
 
-<div id="viewer-paints"></div>
-<div id="radar-container"><div id="center-marker"></div></div>
+    <div class="controls">
+        <label class="btn">写真をアップロード<input type="file" id="upload" accept="image/*"></label>
+        <button class="btn" id="requestPermission" style="display:none;">センサー起動</button>
+    </div>
 
-<script src="https://www.youtube.com/iframe_api"></script>
-<script>
-let players = [];
-let videoData = [];
-let baseHeading = null;
-let isStarted = false;
+    <script>
+        const upload = document.getElementById('upload');
+        const preview = document.getElementById('preview');
+        const permissionBtn = document.getElementById('requestPermission');
 
-// 1. YouTube ID抽出
-function extractID(url) {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-}
-
-// 2. アプリ開始
-async function startApp() {
-    const urls = document.querySelectorAll('.v-url');
-    const angles = document.querySelectorAll('.v-angle');
-    
-    videoData = Array.from(urls).map((el, i) => ({
-        id: extractID(el.value),
-        angle: parseFloat(angles[i].value)
-    }));
-
-    const container = document.getElementById('viewer-paints');
-    container.innerHTML = '';
-
-    // 🌟 逐次初期化 (async/awaitで1つずつ順番に生成)
-    for (let i = 0; i < videoData.length; i++) {
-        const data = videoData[i];
-        const wrapper = document.createElement('div');
-        wrapper.className = 'video-wrapper';
-        wrapper.id = `wrapper-${i}`;
-        const playerDiv = document.createElement('div');
-        playerDiv.id = `player-${i}`;
-        wrapper.appendChild(playerDiv);
-        container.appendChild(wrapper);
-        
-        // わずかな遅延を挟んでブラウザのパンクを防ぐ
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        players[i] = new YT.Player(`player-${i}`, {
-            videoId: data.id,
-            playerVars: { 
-                'autoplay': (Math.abs(data.angle) < 15) ? 1 : 0, // 🌟 正面以外は最初は自動再生させない
-                'mute': 1, 
-                'controls': 0, 
-                'playsinline': 1, 
-                'rel': 0 
-            },
-            events: {
-                'onReady': (e) => {
-                    e.target.setPlaybackQuality('small'); 
-                    // 🌟 正面に近い場合のみ、即座にミュート解除して再生
-                    if (Math.abs(data.angle) < 15) {
-                        e.target.playVideo();
-                        e.target.unMute();
-                    }
-                }
+        upload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => preview.src = event.target.result;
+                reader.readAsDataURL(file);
             }
         });
 
-        const dot = document.createElement('div');
-        dot.className = 'radar-dot';
-        dot.id = `dot-${i}`;
-        dot.style.transform = `translate(-50%, -50%) rotate(${data.angle}deg)`;
-        document.getElementById('radar-container').appendChild(dot);
-    }
-
-    // センサー許可 (iOS)
-    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-        const res = await DeviceOrientationEvent.requestPermission();
-        if (res === 'granted') initSensor();
-    } else { 
-        initSensor(); 
-    }
-    
-    document.getElementById('settings').style.display = 'none';
-    isStarted = true;
-}
-
-// 3. センサー & 更新ロジック
-function initSensor() {
-    window.addEventListener('deviceorientation', (e) => {
-        if (!isStarted) return;
-        let heading = e.webkitCompassHeading || (360 - e.alpha);
-        if (baseHeading === null) baseHeading = heading;
-        
-        let relativeHeading = heading - baseHeading;
-        if (relativeHeading > 180) relativeHeading -= 360;
-        if (relativeHeading < -180) relativeHeading += 360;
-
-        videoData.forEach((data, i) => {
-            let diff = Math.abs(relativeHeading - data.angle);
-            if (diff > 180) diff = 360 - diff;
-
-            const wrapper = document.getElementById(`wrapper-${i}`);
-            const dot = document.getElementById(`dot-${i}`);
+        function handleOrientation(event) {
+            let { beta, gamma } = event;
             
-            // 映像スイッチング (15度以内なら表示)
-            if (diff < 15) {
-                wrapper.style.visibility = 'visible';
-                wrapper.style.opacity = 1;
-                dot.style.background = '#00ff96'; // レーダー上の現在地を強調
-            } else {
-                wrapper.style.visibility = 'hidden';
-                wrapper.style.opacity = 0;
-                dot.style.background = '#fff';
-            }
+            // 基準位置の調整（スマホを立てて持つ想定）
+            let x = (gamma + 25) * (100 / 50); // -25度〜25度
+            let y = (beta - 35) * (100 / 60);  // 35度〜95度
 
-            // 音声制御 (25度離れると消音)
-            if (players[i] && players[i].setVolume) {
-                let vol = Math.max(0, 100 - (diff * 4)); 
-                players[i].setVolume(vol);
-                if (vol > 0) players[i].unMute(); else players[i].mute();
-            }
+            // 範囲制限(0-100%)
+            x = Math.max(0, Math.min(100, x));
+            y = Math.max(0, Math.min(100, y));
+
+            document.documentElement.style.setProperty('--x', `${x}%`);
+            document.documentElement.style.setProperty('--y', `${y}%`);
+
+            // 傾きの強さを計算（絶対値の和）
+            const intensity = (Math.abs(gamma) / 25 + Math.abs(beta - 65) / 30) / 2;
+            document.documentElement.style.setProperty('--intensity', Math.min(1, intensity));
+        }
+
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            permissionBtn.style.display = 'block';
+            permissionBtn.onclick = () => {
+                DeviceOrientationEvent.requestPermission().then(state => {
+                    if (state === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        permissionBtn.style.display = 'none';
+                    }
+                });
+            };
+        } else {
+            window.addEventListener('deviceorientation', handleOrientation);
+        }
+
+        // PCテスト用（マウス移動）
+        window.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth) * 100;
+            const y = (e.clientY / window.innerHeight) * 100;
+            document.documentElement.style.setProperty('--x', `${x}%`);
+            document.documentElement.style.setProperty('--y', `${y}%`);
+            document.documentElement.style.setProperty('--intensity', 0.5);
         });
-
-        // レーダー回転
-        document.getElementById('radar-container').style.transform = `translateX(-50%) rotate(${-relativeHeading}deg)`;
-    });
-}
-
-// 4. リセット機能 (ダブルタップ)
-window.addEventListener('dblclick', () => {
-    baseHeading = null;
-    console.log("Center Reset");
-});
-</script>
+    </script>
 </body>
 </html>
