@@ -5,84 +5,90 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ultimate Rare Card Maker</title>
     <style>
-        :root { --x: 50%; --y: 50%; --intensity: 0; }
-        body { background: #050505; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; color: white; overflow: hidden; }
+        :root { --px: 50%; --py: 50%; --intensity: 0.5; }
+        body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; color: white; overflow: hidden; }
         
-        /* カードコンテナ（外枠：金枠） */
+        /* 最初の金枠スタイルを完全復活 */
         .card-container {
             position: relative;
-            width: 310px;
-            height: 440px;
-            border-radius: 16px;
-            /* しっかりした金枠（border-imageを使用） */
-            border: 12px solid;
-            border-image: linear-gradient(135deg, #b8860b, #ffd700, #fff8dc, #ffd700, #b8860b) 1;
-            /* 枠の光沢移動 */
-            background: linear-gradient(calc(var(--y) * 3.6), transparent, rgba(255,255,200,0.6), transparent);
-            background-size: 100% 200%;
-            background-position: 0 var(--y);
-            box-shadow: 0 15px 50px rgba(0,0,0,0.8), 0 0 30px rgba(255,215,0,0.3);
-            overflow: hidden;
+            width: 300px;
+            height: 420px;
+            border-radius: 15px;
+            padding: 12px;
+            background: linear-gradient(135deg, #ffd700, #fff8dc, #b8860b, #ffd700, #fff8dc);
+            background-size: 400% 400%;
+            background-position: var(--px) var(--py);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(255,215,0,0.3);
             transition: background-position 0.1s ease-out;
+            display: flex;
         }
 
-        /* 写真エリア */
+        /* 写真表示エリア */
         .photo-area {
             position: relative;
             width: 100%;
             height: 100%;
-            background: #111;
+            background: #222;
+            border-radius: 8px;
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .photo-area img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* レイヤー1: 虹色ホロ（斜めのツヤ感）※前回の方式を復元 */
+        /* 虹色ホログラム層 */
         .hologram {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             mix-blend-mode: color-dodge;
-            opacity: calc(0.4 + var(--intensity) * 0.3);
+            opacity: 0.7;
             background: linear-gradient(115deg, 
                 transparent 15%, 
-                rgba(255,100,100,0.5) 30%, 
-                rgba(255,255,100,0.5) 40%, 
-                rgba(100,255,255,0.5) 50%, 
-                rgba(100,100,255,0.5) 60%, 
+                rgba(255,100,100,0.6) 25%, 
+                rgba(255,255,100,0.6) 40%, 
+                rgba(100,255,255,0.6) 55%, 
+                rgba(100,100,255,0.6) 70%, 
                 transparent 85%
             );
             background-size: 200% 200%;
-            background-position: var(--x) var(--y);
+            background-position: var(--px) var(--py);
             pointer-events: none;
+            z-index: 2;
         }
 
-        /* レイヤー2: ラメ（粒感を強化） */
+        /* びっしりラメ層 */
         .glitter {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             mix-blend-mode: screen;
-            opacity: calc(0.3 + var(--intensity) * 0.7); /* 傾けるとギラッと光る */
+            opacity: calc(0.3 + var(--intensity) * 0.7);
             background-image: 
-                /* 粒を大きく、パキッと */
-                radial-gradient(circle, #fff 1.5px, transparent 1.5px),
-                radial-gradient(circle, #ffd700 1.8px, transparent 1.8px),
-                radial-gradient(circle, #fff 1px, transparent 1px);
-            background-size: 30px 30px, 50px 50px, 70px 70px;
-            /* 上下左右で複雑に動かす */
-            background-position: calc(var(--x) * 0.1) calc(var(--y) * 0.1), calc(var(--x) * -0.1) calc(var(--y) * -0.1), calc(var(--x) * 0.2) calc(var(--y) * -0.2);
+                radial-gradient(circle, #fff 1.2px, transparent 1.2px),
+                radial-gradient(circle, #ffd700 1.5px, transparent 1.5px),
+                radial-gradient(circle, #fff 0.8px, transparent 0.8px),
+                radial-gradient(circle, #fff 1.5px, transparent 1.5px);
+            background-size: 20px 20px, 35px 35px, 15px 15px, 50px 50px;
+            background-position: 
+                calc(var(--px) * 0.1) calc(var(--py) * 0.1), 
+                calc(var(--px) * -0.1) calc(var(--py) * -0.1),
+                calc(var(--px) * 0.2) calc(var(--py) * -0.1),
+                calc(var(--px) * -0.15) calc(var(--py) * 0.2);
             pointer-events: none;
+            z-index: 3;
         }
 
-        .controls { margin-top: 30px; display: flex; gap: 15px; z-index: 10; }
+        .controls { margin-top: 25px; z-index: 10; display: flex; gap: 10px; }
         input[type="file"] { display: none; }
-        .btn { background: linear-gradient(#fff, #ccc); color: #111; padding: 12px 24px; border-radius: 30px; cursor: pointer; font-weight: bold; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-size: 14px; }
+        .btn { background: #ffd700; color: #333; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-weight: bold; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
 
-    <div class="card-container">
+    <div class="card-container" id="card">
         <div class="photo-area">
-            <img id="preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%231a1a1a'/%3E%3C/svg%3E">
+            <img id="preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23333'/%3E%3C/svg%3E">
             <div class="hologram"></div>
             <div class="glitter"></div>
         </div>
@@ -90,7 +96,7 @@
 
     <div class="controls">
         <label class="btn">写真をアップロード<input type="file" id="upload" accept="image/*"></label>
-        <button class="btn" id="requestPermission" style="display:none;">センサー起動</button>
+        <button class="btn" id="requestPermission" style="display:none;">センサー許可</button>
     </div>
 
     <script>
@@ -108,26 +114,22 @@
         });
 
         function handleOrientation(event) {
-            let { beta, gamma } = event;
+            const { beta, gamma } = event;
             
-            // 基準位置の調整（スマホを立てて持つ想定）
-            let x = (gamma + 25) * (100 / 50); // -25度〜25度
-            let y = (beta - 35) * (100 / 60);  // 35度〜95度
+            // 左右(gamma)と上下(beta)を0-100%に変換
+            const xPerc = Math.max(0, Math.min(100, (gamma + 25) * (100 / 50)));
+            const yPerc = Math.max(0, Math.min(100, (beta - 35) * (100 / 60)));
 
-            // 範囲制限(0-100%)
-            x = Math.max(0, Math.min(100, x));
-            y = Math.max(0, Math.min(100, y));
-
-            document.documentElement.style.setProperty('--x', `${x}%`);
-            document.documentElement.style.setProperty('--y', `${y}%`);
-
-            // 傾きの強さを計算（絶対値の和）
+            document.documentElement.style.setProperty('--px', `${xPerc}%`);
+            document.documentElement.style.setProperty('--py', `${yPerc}%`);
+            
+            // 傾きが大きいほどラメを光らせる
             const intensity = (Math.abs(gamma) / 25 + Math.abs(beta - 65) / 30) / 2;
             document.documentElement.style.setProperty('--intensity', Math.min(1, intensity));
         }
 
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            permissionBtn.style.display = 'block';
+            permissionBtn.style.display = 'inline-block';
             permissionBtn.onclick = () => {
                 DeviceOrientationEvent.requestPermission().then(state => {
                     if (state === 'granted') {
@@ -140,13 +142,12 @@
             window.addEventListener('deviceorientation', handleOrientation);
         }
 
-        // PCテスト用（マウス移動）
         window.addEventListener('mousemove', (e) => {
-            const x = (e.clientX / window.innerWidth) * 100;
-            const y = (e.clientY / window.innerHeight) * 100;
-            document.documentElement.style.setProperty('--x', `${x}%`);
-            document.documentElement.style.setProperty('--y', `${y}%`);
-            document.documentElement.style.setProperty('--intensity', 0.5);
+            const xPerc = (e.clientX / window.innerWidth) * 100;
+            const yPerc = (e.clientY / window.innerHeight) * 100;
+            document.documentElement.style.setProperty('--px', `${xPerc}%`);
+            document.documentElement.style.setProperty('--py', `${yPerc}%`);
+            document.documentElement.style.setProperty('--intensity', 0.6);
         });
     </script>
 </body>
