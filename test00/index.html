@@ -3,26 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smooth Ultra Rare Card</title>
+    <title>Perfect Reflection Card</title>
     <style>
         :root { --px: 50%; --py: 50%; --intensity: 0.5; }
-        body { background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; color: white; overflow: hidden; }
+        body { background: #050505; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; overflow: hidden; }
         
-        /* 金枠：最初のパキッとした質感を維持しつつ滑らかに */
         .card-container {
             position: relative;
             width: 300px;
             height: 420px;
             border-radius: 15px;
             padding: 12px;
-            background: linear-gradient(135deg, 
-                #b8860b 0%, #ffd700 20%, #fff8dc 40%, #ffd700 50%, #fff8dc 60%, #ffd700 80%, #b8860b 100%
-            );
-            background-size: 300% 300%; /* 少しサイズを落として端のループ感を軽減 */
+            background: linear-gradient(135deg, #ffd700, #fff8dc, #b8860b, #ffd700, #fff8dc);
+            background-size: 400% 400%;
             background-position: var(--px) var(--py);
-            box-shadow: 0 10px 40px rgba(0,0,0,0.7), 0 0 20px rgba(255,215,0,0.2);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.8), 0 0 20px rgba(255,215,0,0.2);
             display: flex;
-            transition: background-position 0.2s cubic-bezier(0.1, 0, 0.2, 1); /* 動きを滑らかに */
+            transition: background-position 0.1s linear; /* 反射なのでリニアな動きが自然 */
         }
 
         .photo-area {
@@ -32,71 +29,72 @@
             background: #111;
             border-radius: 8px;
             overflow: hidden;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            z-index: 1;
         }
 
         .photo-area img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* 虹色ホログラム層：中央をピークにしたグラデーションで「カクッ」を防止 */
+        /* ワイド十字虹ホログラム */
         .hologram {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            mix-blend-mode: color-dodge;
-            opacity: 0.75;
-            background: linear-gradient(115deg, 
-                transparent 10%, 
-                rgba(255,100,100,0.5) 25%, 
-                rgba(255,255,100,0.6) 40%, 
-                rgba(100,255,255,0.6) 55%, 
-                rgba(100,100,255,0.5) 70%, 
-                transparent 90%
-            );
-            background-size: 250% 250%;
-            background-position: var(--px) var(--py);
             pointer-events: none;
             z-index: 2;
+            mix-blend-mode: color-dodge;
+            opacity: 0.95;
+            background: 
+                linear-gradient(90deg, 
+                    transparent calc(var(--px) - 30%), 
+                    rgba(255,0,0,0.4) calc(var(--px) - 20%), 
+                    rgba(255,255,0,0.4) calc(var(--px) - 10%), 
+                    rgba(0,255,0,0.4) var(--px), 
+                    rgba(0,255,255,0.4) calc(var(--px) + 10%), 
+                    rgba(0,0,255,0.4) calc(var(--px) + 20%), 
+                    transparent calc(var(--px) + 30%)
+                ),
+                linear-gradient(0deg, 
+                    transparent calc(var(--py) - 30%), 
+                    rgba(255,0,0,0.4) calc(var(--py) - 20%), 
+                    rgba(255,255,0,0.4) calc(var(--py) - 10%), 
+                    rgba(0,255,0,0.4) var(--py), 
+                    rgba(0,255,255,0.4) calc(var(--py) + 10%), 
+                    rgba(0,0,255,0.4) calc(var(--py) + 20%), 
+                    transparent calc(var(--py) + 30%)
+                );
+            background-size: 100% 100%;
         }
 
-        /* びっしりラメ層 */
         .glitter {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
             mix-blend-mode: screen;
             opacity: calc(0.3 + var(--intensity) * 0.7);
             background-image: 
-                radial-gradient(circle, #fff 1px, transparent 1px),
-                radial-gradient(circle, #ffd700 1.2px, transparent 1.2px),
-                radial-gradient(circle, #fff 0.8px, transparent 0.8px),
-                radial-gradient(circle, #fff 1.5px, transparent 1.5px);
-            background-size: 22px 22px, 33px 33px, 18px 18px, 48px 48px;
-            background-position: 
-                calc(var(--px) * 0.1) calc(var(--py) * 0.1), 
-                calc(var(--px) * -0.12) calc(var(--py) * -0.12),
-                calc(var(--px) * 0.2) calc(var(--py) * -0.05),
-                calc(var(--px) * -0.08) calc(var(--py) * 0.15);
+                radial-gradient(circle, #fff 1.2px, transparent 1.2px),
+                radial-gradient(circle, #ffd700 1.5px, transparent 1.5px),
+                radial-gradient(circle, #fff 0.8px, transparent 0.8px);
+            background-size: 20px 20px, 35px 35px, 15px 15px;
+            background-position: calc(var(--px) * 0.05) calc(var(--py) * 0.05);
+            z-index: 4;
             pointer-events: none;
-            z-index: 3;
         }
 
         .controls { margin-top: 25px; display: flex; gap: 10px; z-index: 10; }
-        .btn { background: #ffd700; color: #111; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-weight: bold; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        input[type="file"] { display: none; }
+        .btn { background: #ffd700; color: #111; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-weight: bold; border: none; }
     </style>
 </head>
 <body>
 
     <div class="card-container" id="card">
         <div class="photo-area">
-            <img id="preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23222'/%3E%3C/svg%3E">
+            <img id="preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23111'/%3E%3C/svg%3E">
             <div class="hologram"></div>
             <div class="glitter"></div>
         </div>
     </div>
 
     <div class="controls">
-        <label class="btn">写真をアップロード<input type="file" id="upload" accept="image/*"></label>
+        <label class="btn">写真をアップロード<input type="file" id="upload" accept="image/*" style="display:none;"></label>
         <button class="btn" id="requestPermission" style="display:none;">センサー許可</button>
     </div>
 
@@ -114,22 +112,20 @@
             }
         });
 
-        // センサー連動：マイルドな追従に計算を修正
         function handleOrientation(event) {
             let { beta, gamma } = event;
             
-            // 遊び（余白）を持たせて計算。0-100%に収まりやすくする。
-            let x = (gamma + 35) * (100 / 70);
-            let y = (beta - 25) * (100 / 70);
+            // 物理反射ロジック（上下左右すべて逆方向に光が動く）
+            let x = 50 - (gamma * 1.5); 
+            let y = 50 - (beta - 45) * 1.5;
 
-            // 急激な変化を防ぐため、値を制限しつつ滑らかに
             x = Math.max(0, Math.min(100, x));
             y = Math.max(0, Math.min(100, y));
 
             document.documentElement.style.setProperty('--px', `${x}%`);
             document.documentElement.style.setProperty('--py', `${y}%`);
             
-            const intensity = (Math.abs(gamma) / 30 + Math.abs(beta - 55) / 35) / 2;
+            const intensity = (Math.abs(gamma) / 30 + Math.abs(beta - 45) / 30);
             document.documentElement.style.setProperty('--intensity', Math.min(1, intensity));
         }
 
@@ -147,10 +143,10 @@
             window.addEventListener('deviceorientation', handleOrientation);
         }
 
-        // PCマウス操作
         window.addEventListener('mousemove', (e) => {
-            const x = (e.clientX / window.innerWidth) * 100;
-            const y = (e.clientY / window.innerHeight) * 100;
+            // マウスの動きも反射に統一
+            const x = 100 - (e.clientX / window.innerWidth) * 100;
+            const y = 100 - (e.clientY / window.innerHeight) * 100;
             document.documentElement.style.setProperty('--px', `${x}%`);
             document.documentElement.style.setProperty('--py', `${y}%`);
         });
