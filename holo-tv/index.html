@@ -158,6 +158,33 @@
             font-size: 10px; cursor: pointer; background: #222; border-left: 3px solid var(--accent); color: #eee; 
             overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 10;
         }
+
+        /* --- スマホ・タッチデバイス専用：YouTube離脱防止ガード --- */
+/* (pointer: coarse) は「指などの粗いポインティングデバイス」＝スマホ・タブレットを指します */
+@media screen and (max-width: 768px) or (pointer: coarse) {
+    body.mode-epg #player-section.needs-first-tap::after {
+        content: "▶️ TAP TO PLAY";
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 2005;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        color: #fff;
+        cursor: pointer;
+        pointer-events: auto; /* ここでタップを奪ってYouTubeへの離脱を防ぐ */
+        backdrop-filter: blur(2px);
+    }
+}
+
+/* 共通：タップされた後やWATCHモードではガードを完全に消去 */
+#player-section:not(.needs-first-tap)::after,
+body.mode-watch #player-section::after {
+    display: none !important;
+}
     </style>
 </head>
 <body class="mode-watch">
@@ -339,18 +366,54 @@
         }
     }
 
-    function play(id, name, title, member) {
-        currentVideoId = id;
-        document.getElementById('video-iframe').src = `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&enablejsapi=1`;
-        document.getElementById('chat-iframe').src = `https://www.youtube.com/live_chat?v=${id}&embed_domain=${window.location.hostname}`;
-        document.getElementById('current-ch-name').innerText = name;
-        if (member) {
-            document.getElementById('guard-title').innerText = title;
-            document.getElementById('member-guard').style.display = 'flex';
-        } else {
-            closeGuard();
-        }
+function play(id, name, title, member) {
+    currentVideoId = id;
+    const playerSection = document.getElementById('player-section');
+    
+    // 1. 基本的に「未タップ」クラスを付与する
+    playerSection.classList.add('needs-first-tap');
+
+    // 【PC対策】マウス操作（pointer: fine）かつ画面幅がある程度広い場合は、
+    // 自動再生が効く可能性が高いため、ガードをすぐに解除する
+    if (window.matchMedia("(min-width: 769px) and (pointer: fine)").matches) {
+        // PC環境ならクラスを即座に外す（CSS側のガードを無効化）
+        playerSection.classList.remove('needs-first-tap');
     }
+
+    document.getElementById('video-iframe').src = `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&enablejsapi=1`;
+    document.getElementById('chat-iframe').src = `https://www.youtube.com/live_chat?v=${id}&embed_domain=${window.location.hostname}`;
+    document.getElementById('current-ch-name').innerText = name;
+    
+    if (member) {
+        document.getElementById('guard-title').innerText = title;
+        document.getElementById('member-guard').style.display = 'flex';
+    } else {
+        closeGuard();
+    }
+}
+
+// 【スマホ用】小窓タップ時にYouTubeへの離脱をガードする処理
+document.addEventListener('DOMContentLoaded', () => {
+    const playerSection = document.getElementById('player-section');
+    playerSection.addEventListener('click', function(e) {
+        // スマホなどのタッチ環境で、かつ「未タップ」状態の時だけガードを実行
+        if (document.body.classList.contains('mode-epg') && this.classList.contains('needs-first-tap')) {
+            
+            // 1. クラスを消して、CSSの「膜」を取り払う
+            this.classList.remove('needs-first-tap');
+            
+            // 2. YouTube iframeに再生命令を送る
+            const iframe = document.getElementById('video-iframe');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+            }
+            
+            // 3. YouTube公式へのリンク移動をキャンセル
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, true); 
+});
 
     function closeGuard() { document.getElementById('member-guard').style.display = 'none'; }
 
