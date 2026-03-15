@@ -139,56 +139,53 @@
         }
 
         /* メン限ガードを動画の上に重ねる設定 */
-#member-guard {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.85); /* 背景を暗く */
-    z-index: 1000; /* iframeより上に */
-    display: none; /* JSでflexに切り替え */
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    text-align: center;
-    backdrop-filter: blur(4px); /* 背景をぼかすとおしゃれ */
-}
+        #member-guard {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85); /* 背景を暗く */
+            z-index: 1000; /* iframeより上に */
+            display: none; /* JSでflexに切り替え */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+            backdrop-filter: blur(4px); /* 背景をぼかすとおしゃれ */
+        }
         .stream-card {
             position: absolute; width: calc(var(--ch-width) - 10px); margin: 0 5px; padding: 8px; border-radius: 4px;
             font-size: 10px; cursor: pointer; background: #222; border-left: 3px solid var(--accent); color: #eee; 
             overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 10;
         }
-/* ガード自体の見た目（JSでクラスがついた時だけ出る） */
-body.mode-epg #player-section.needs-first-tap::after {
-    content: "▶️ TAP TO PLAY";
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5); /* 膜の暗さ */
-    z-index: 2005;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: bold;
-    color: #fff;
-    cursor: pointer;
-    pointer-events: auto; /* ここでクリックを吸い取る */
-}
 
-/* WATCHモードや、一度タップした後は絶対に出さない */
-body.mode-watch #player-section::after,
-#player-section:not(.needs-first-tap)::after {
-    display: none !important;
-}
+        /* --- 透明ガードの統合設定 --- */
+        
+        /* ガード自体の見た目（完全に透明だが、クリックは吸い取る） */
+        #player-section.needs-first-tap::after {
+            content: ""; /* 文字も出さず完全に透明 */
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0); /* 完全に透明 */
+            z-index: 2005;
+            display: block;
+            cursor: pointer;
+            pointer-events: auto;
+        }
 
-/* ガード膜がある間は、背後のiframeへの直接の反応を無効化して誤爆を完全に防ぐ */
-body.mode-epg #player-section.needs-first-tap iframe {
-    pointer-events: none;
-}
-/* タップして膜が消えたら、iframeへの操作を許可する */
-#player-section:not(.needs-first-tap) iframe {
-    pointer-events: auto;
-}
+        /* クラスがない時は絶対に出さない */
+        #player-section:not(.needs-first-tap)::after {
+            display: none !important;
+        }
+
+        /* ガードがある間は、背後のiframeへの直接操作を禁止 */
+        #player-section.needs-first-tap iframe {
+            pointer-events: none;
+        }
+        /* タップ後はiframeの操作を許可 */
+        #player-section:not(.needs-first-tap) iframe {
+            pointer-events: auto;
+        }
 
     </style>
 </head>
@@ -234,9 +231,8 @@ body.mode-epg #player-section.needs-first-tap iframe {
         </div>
     </div>
 </div>
-
 <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzBS93O5OnbG4FiQzCT0Vuf_Y6kxKxIBu6Kb4gQsNbdS5YZzgD1eCtKL29Vm0trtGPlVA/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzBS93O5OnbG4FiQzCT0Vuf_Y6kxKxIBu6Kb4gQsNbdS5YZzgD1eCtKL29Vm0trtGPlVA/exec";
     const ALLOWED_GENS = ["0th Gen", "1st Gen", "2nd Gen", "Gamers", "3rd Gen", "4th Gen", "5th Gen", "6th Gen", "Secret Society holoX", "DEV_IS ReGLOSS", "DEV_IS FLOW\\s?GLOW"];
     
     let cachedData, orderedIds = [], channels = {}, currentVideoId = "";
@@ -244,12 +240,10 @@ body.mode-epg #player-section.needs-first-tap iframe {
 
     async function loadEPG() {
         try {
-            // 読み込み中であることがわかるように、コンソールかUIに表示
             console.log("Fetching EPG data...");
             const res = await fetch(GAS_URL);
             cachedData = await res.json();
             
-            // データが空（エラー時など）の対策
             if (!cachedData || cachedData.length === 0) {
                 console.warn("No data received from GAS");
                 return;
@@ -263,128 +257,129 @@ body.mode-epg #player-section.needs-first-tap iframe {
 
     function checkMemberOnly(title) { return /メン限|メンバー限定|Member Only|Membership/i.test(title); }
 
-    function renderEPG(data) {
-        const stickyHeader = document.getElementById('epg-sticky-header');
-        const gridBody = document.getElementById('epg-grid-body');
-        const timesList = document.getElementById('epg-times-list');
-        const dateDisplay = document.getElementById('epg-date');
-        
-        stickyHeader.innerHTML = ''; gridBody.innerHTML = ''; timesList.innerHTML = '';
-        const now = new Date();
-        dateDisplay.innerText = `${now.getMonth()+1}/${now.getDate()}`;
-        const startH = now.getHours();
+function renderEPG(data) {
+    const stickyHeader = document.getElementById('epg-sticky-header');
+    const gridBody = document.getElementById('epg-grid-body');
+    const timesList = document.getElementById('epg-times-list');
+    const dateDisplay = document.getElementById('epg-date');
+    
+    stickyHeader.innerHTML = ''; gridBody.innerHTML = ''; timesList.innerHTML = '';
+    const now = new Date();
+    dateDisplay.innerText = `${now.getMonth()+1}/${now.getDate()}`;
+    const startH = now.getHours();
 
-        channels = {};
-        data.forEach(s => {
-            const sub = (s.channel.suborg || "").toLowerCase();
-            if (sub.includes("holostars") || sub.includes("english") || sub.includes("indonesia")) return;
-            const genIndex = ALLOWED_GENS.findIndex(g => new RegExp(g.toLowerCase()).test(sub));
-            if (genIndex !== -1) {
-                if (!channels[s.channel.id]) channels[s.channel.id] = { info: s.channel, streams: [], genScore: genIndex };
-                channels[s.channel.id].streams.push(s);
+    // グリッド開始基準時刻（現在の「時」の00分00秒）
+    const gridStartTime = new Date(now);
+    gridStartTime.setMinutes(0, 0, 0);
+
+    channels = {};
+    data.forEach(s => {
+        const sub = (s.channel.suborg || "").toLowerCase();
+        if (sub.includes("holostars") || sub.includes("english") || sub.includes("indonesia")) return;
+        const genIndex = ALLOWED_GENS.findIndex(g => new RegExp(g.toLowerCase()).test(sub));
+        if (genIndex !== -1) {
+            if (!channels[s.channel.id]) channels[s.channel.id] = { info: s.channel, streams: [], genScore: genIndex };
+            channels[s.channel.id].streams.push(s);
+        }
+    });
+
+    orderedIds = Object.keys(channels).sort((a, b) => {
+        const isLive = (ch) => ch.streams.some(s => {
+            if (s.status === 'live') return true;
+            const st = new Date(s.start_actual || s.start_scheduled);
+            return (now >= st && (now - st) < 3 * 60 * 60 * 1000);
+        });
+        const isLiveA = isLive(channels[a]) ? 1 : 0;
+        const isLiveB = isLive(channels[b]) ? 1 : 0;
+        if (isLiveA !== isLiveB) return isLiveB - isLiveA;
+        return channels[a].genScore - channels[b].genScore;
+    });
+
+    for(let i=0; i<24; i++) {
+        const div = document.createElement('div');
+        div.className = 'time-slot';
+        div.innerText = `${(startH + i) % 24}:00`;
+        timesList.appendChild(div);
+    }
+
+    gridBody.style.width = `${orderedIds.length * 160}px`;
+
+    orderedIds.forEach((chId, idx) => {
+        const ch = channels[chId];
+        const chX = idx * 160;
+        const col = document.createElement('div');
+        col.className = 'ch-col-header';
+        const nameBox = document.createElement('div');
+        nameBox.className = 'ch-name-box';
+        nameBox.innerHTML = `<img src="${ch.info.photo}" style="width:18px;height:18px;border-radius:50%;margin-right:4px;">${ch.info.name.substring(0,5)}`;
+        
+        const live = ch.streams.find(s => {
+            if (s.status === 'live') return true;
+            const st = new Date(s.start_actual || s.start_scheduled);
+            return (now >= st && (now - st) < 3 * 60 * 60 * 1000);
+        });
+
+        const nowBox = document.createElement('div');
+        const member = live && checkMemberOnly(live.title);
+        nowBox.className = 'now-stream-box' + (live ? (member ? ' member' : '') : ' empty');
+        nowBox.innerHTML = live ? (member ? '🔒 ' : '') + live.title : '---';
+        if (live) nowBox.onclick = () => play(live.id, ch.info.name, live.title, member);
+        
+        col.appendChild(nameBox);
+        col.appendChild(nowBox);
+        stickyHeader.appendChild(col);
+
+        ch.streams.forEach(s => {
+            if (live && s.id === live.id) return;
+            
+            const st = new Date(s.start_actual || s.start_scheduled);
+            
+            // 【修正】グリッド開始時刻からのミリ秒差分を計算
+            const diffMs = st - gridStartTime;
+            
+            // 24時間（86400000ms）以内のものだけ表示
+            // かつ、現在より過去すぎるものは除外（例えば30分以上前の予定は出さない等、好みで調整可能）
+            if (diffMs >= 0 && diffMs < 24 * 60 * 60 * 1000) {
+                // ミリ秒を分に直し、1分 = 2px (1時間=120px) で配置
+                const topPos = (diffMs / (1000 * 60)) * 2;
+
+                const card = document.createElement('div');
+                card.className = 'stream-card';
+                card.style.left = `${chX}px`;
+                card.style.top = `${topPos}px`;
+                card.style.height = `90px`;
+                const dateStr = `${st.getMonth()+1}/${st.getDate()} ${st.getHours()}:${st.getMinutes().toString().padStart(2,'0')}`;
+                card.innerHTML = `<div style="color:var(--accent);font-weight:bold;font-size:9px;margin-bottom:4px;">${dateStr}</div>${s.title}`;
+                card.onclick = () => play(s.id, ch.info.name, s.title, checkMemberOnly(s.title));
+                gridBody.appendChild(card);
             }
         });
+    });
 
-        // 1. ソート順の判定も「時間基準」を考慮
-        orderedIds = Object.keys(channels).sort((a, b) => {
-            const isLive = (ch) => ch.streams.some(s => {
-                if (s.status === 'live') return true;
-                const st = new Date(s.start_actual || s.start_scheduled);
-                return (now >= st && (now - st) < 3 * 60 * 60 * 1000);
-            });
-            const isLiveA = isLive(channels[a]) ? 1 : 0;
-            const isLiveB = isLive(channels[b]) ? 1 : 0;
-            if (isLiveA !== isLiveB) return isLiveB - isLiveA;
-            return channels[a].genScore - channels[b].genScore;
-        });
-
-        for(let i=0; i<24; i++) {
-            const div = document.createElement('div');
-            div.className = 'time-slot';
-            div.innerText = `${(startH + i) % 24}:00`;
-            timesList.appendChild(div);
-        }
-
-        gridBody.style.width = `${orderedIds.length * 160}px`;
-
-        orderedIds.forEach((chId, idx) => {
-            const ch = channels[chId];
-            const chX = idx * 160;
-            const col = document.createElement('div');
-            col.className = 'ch-col-header';
-            const nameBox = document.createElement('div');
-            nameBox.className = 'ch-name-box';
-            nameBox.innerHTML = `<img src="${ch.info.photo}" style="width:18px;height:18px;border-radius:50%;margin-right:4px;">${ch.info.name.substring(0,5)}`;
-            
-            // 2. NOW判定を「ステータス」＋「経過時間」に強化
-            const live = ch.streams.find(s => {
-                if (s.status === 'live') return true;
-                const st = new Date(s.start_actual || s.start_scheduled);
-                return (now >= st && (now - st) < 3 * 60 * 60 * 1000);
-            });
-
-            const nowBox = document.createElement('div');
-            const member = live && checkMemberOnly(live.title);
-            nowBox.className = 'now-stream-box' + (live ? (member ? ' member' : '') : ' empty');
-            nowBox.innerHTML = live ? (member ? '🔒 ' : '') + live.title : '---';
-            if (live) nowBox.onclick = () => play(live.id, ch.info.name, live.title, member);
-            
-            col.appendChild(nameBox);
-            col.appendChild(nowBox);
-            stickyHeader.appendChild(col);
-
-            ch.streams.forEach(s => {
-                // 3. NOW枠に表示したものは予定表(カード)には出さない
-                if (live && s.id === live.id) return;
-                
-                const st = new Date(s.start_actual || s.start_scheduled);
-                let hourDiff = st.getHours() - startH;
-                if (hourDiff < 0) hourDiff += 24; 
-                let topPos = (hourDiff * 120) + (st.getMinutes() * 2);
-
-                if (hourDiff < 24) {
-                    const card = document.createElement('div');
-                    card.className = 'stream-card';
-                    card.style.left = `${chX}px`;
-                    card.style.top = `${topPos}px`;
-                    card.style.height = `90px`;
-                    const dateStr = `${st.getMonth()+1}/${st.getDate()} ${st.getHours()}:${st.getMinutes().toString().padStart(2,'0')}`;
-                    card.innerHTML = `<div style="color:var(--accent);font-weight:bold;font-size:9px;margin-bottom:4px;">${dateStr}</div>${s.title}`;
-                    card.onclick = () => play(s.id, ch.info.name, s.title, checkMemberOnly(s.title));
-                    gridBody.appendChild(card);
-                }
-            });
-        });
-
-        if (isFirstPlay && orderedIds.length > 0) {
-            const firstId = orderedIds[0];
-            // ここも時間基準で探す
-            const first = channels[firstId].streams.find(s => {
-                if (s.status === 'live') return true;
-                const st = new Date(s.start_actual || s.start_scheduled);
-                return (now >= st && (now - st) < 3 * 60 * 60 * 1000);
-            }) || channels[firstId].streams[0];
-            
-            if (first) play(first.id, channels[firstId].info.name, first.title, checkMemberOnly(first.title));
-            isFirstPlay = false;
-        }
+    if (isFirstPlay && orderedIds.length > 0) {
+        const firstId = orderedIds[0];
+        const first = channels[firstId].streams.find(s => {
+            if (s.status === 'live') return true;
+            const st = new Date(s.start_actual || s.start_scheduled);
+            return (now >= st && (now - st) < 3 * 60 * 60 * 1000);
+        }) || channels[firstId].streams[0];
+        
+        if (first) play(first.id, channels[firstId].info.name, first.title, checkMemberOnly(first.title));
+        isFirstPlay = false;
     }
-
+}
     function play(id, name, title, member) {
         currentVideoId = id;
+        const playerSection = document.getElementById('player-section');
+        
+        // スマホ判定
+        const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-const playerSection = document.getElementById('player-section');
-    
-    // ブラウザの「正体」をチェック（表示モードに左右されない）
-    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    if (isMobileDevice) {
-        // スマホ・タブレットなら、どんな設定でもガードを強制出現
-        playerSection.classList.add('needs-first-tap');
-    } else {
-        // 純粋なPC（Windows/Mac等）ならガードは出さない
-        playerSection.classList.remove('needs-first-tap');
-    }
+        if (isMobileDevice) {
+            playerSection.classList.add('needs-first-tap');
+        } else {
+            playerSection.classList.remove('needs-first-tap');
+        }
 
         document.getElementById('video-iframe').src = `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&enablejsapi=1`;
         document.getElementById('chat-iframe').src = `https://www.youtube.com/live_chat?v=${id}&embed_domain=${window.location.hostname}`;
@@ -397,28 +392,34 @@ const playerSection = document.getElementById('player-section');
         }
     }
 
-// タップ時のイベント処理（前回のままでOK）
-document.addEventListener('DOMContentLoaded', () => {
-    const playerSection = document.getElementById('player-section');
-    const handleStart = function(e) {
-        if (document.body.classList.contains('mode-epg') && playerSection.classList.contains('needs-first-tap')) {
-            playerSection.classList.remove('needs-first-tap');
-            const iframe = document.getElementById('video-iframe');
-            if (iframe && iframe.contentWindow) {
-                iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+    // 透明ガードのタップイベント（WATCH/EPG共通）
+    document.addEventListener('DOMContentLoaded', () => {
+        const playerSection = document.getElementById('player-section');
+        const handleStart = function(e) {
+            // ガードが存在する場合のみ処理
+            if (playerSection.classList.contains('needs-first-tap')) {
+                playerSection.classList.remove('needs-first-tap'); // ガードを消す
+                
+                // 再生命令を送る
+                const iframe = document.getElementById('video-iframe');
+                if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+                }
+                
+                // リンク離脱防止（EPGモードの小窓時などに有効）
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("Guard cleared & Play command sent");
             }
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    };
-    playerSection.addEventListener('click', handleStart, true);
-    playerSection.addEventListener('touchstart', handleStart, { passive: false });
-});
+        };
+        // キャプチャフェーズ(true)で確実に拾う
+        playerSection.addEventListener('click', handleStart, true);
+        playerSection.addEventListener('touchstart', handleStart, { passive: false });
+    });
 
     function closeGuard() { document.getElementById('member-guard').style.display = 'none'; }
 
-function zap(dir) {
-        // 「今放送中（または時間的に始まっているはず）」のチャンネルを抽出
+    function zap(dir) {
         const lives = orderedIds.filter(id => {
             return channels[id].streams.some(s => {
                 if (s.status === 'live') return true;
@@ -433,7 +434,6 @@ function zap(dir) {
         let idx = lives.findIndex(id => channels[id].streams.some(s => s.id === currentVideoId));
         idx = (idx === -1) ? 0 : (idx + dir + lives.length) % lives.length;
         
-        // ターゲットの配信情報を取得
         const targetCh = channels[lives[idx]];
         const targetStream = targetCh.streams.find(s => {
             if (s.status === 'live') return true;
@@ -457,12 +457,8 @@ function zap(dir) {
         if (e.key === 'ArrowRight') zap(1);
     });
 
-    // 起動時に実行
     loadEPG();
-    
-    // 定期更新：5分ごと (180,000ミリ秒)
-    // GAS側で15分枠判定をしているので、ここで頻繁に叩いても安全です。
-    setInterval(loadEPG, 1000 * 60 * 5); 
+    setInterval(loadEPG, 1000 * 60 * 5);
 </script>
 <script data-goatcounter="https://kb-mugai.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </body>
