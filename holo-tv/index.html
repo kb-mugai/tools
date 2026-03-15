@@ -3,8 +3,6 @@
 <head>
     <link rel="icon" href="favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="icon.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ホロメンTV|非公式hololiveJPメンバー専用TV風アプリ</title>
@@ -31,8 +29,27 @@
             align-items: center; justify-content: space-between; padding: 0 10px;
             border-bottom: 1px solid #333; z-index: 2000;
         }
+        
         .nav-group { display: flex; gap: 8px; align-items: center; }
-        button { background: #333; border: 1px solid #444; color: #fff; padding: 6px 12px; cursor: pointer; border-radius: 6px; font-size: 11px; font-weight: bold; }
+        /* チャンネル名の省略設定 */
+        #current-ch-name {
+            font-size: 11px; 
+            color: var(--accent); 
+            width: 120px; /* 固定幅 */
+            text-align: center; 
+            overflow: hidden; 
+            text-overflow: ellipsis; /* はみ出しを「...」に */
+            white-space: nowrap;
+            font-weight: bold;
+            display: inline-block;
+        }
+        button { 
+            background: #333; border: 1px solid #444; color: #fff; 
+            padding: 6px 10px; cursor: pointer; border-radius: 6px; 
+            font-size: 14px; /* アイコンを少し大きく表示 */
+            font-weight: bold; 
+            transition: 0.2s;
+        }
         button.active { background: var(--accent); color: #000; border-color: var(--accent); }
 
         #app-container { display: flex; height: calc(var(--full-h) - var(--header-h)); width: 100%; position: relative; }
@@ -147,15 +164,17 @@
 
 <header>
     <div class="nav-group">
-        <button id="btn-watch" class="active" onclick="setMode('watch')">WATCH</button>
-        <button id="btn-epg" onclick="setMode('epg')">EPG</button>
+        <button id="btn-watch" class="active" onclick="setMode('watch')" title="視聴">見</button>
+        <button id="btn-epg" onclick="setMode('epg')" title="番組表">表</button>
     </div>
+    
     <div class="nav-group">
         <button onclick="zap(-1)">◀</button>
-        <span id="current-ch-name" style="font-size: 10px; color: var(--accent); min-width: 60px; text-align: center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">---</span>
+        <span id="current-ch-name">---</span>
         <button onclick="zap(1)">▶</button>
     </div>
-    <button onclick="openYouTube()" style="border-color: #f00; color: #f00;">YouTube</button>
+
+    <div style="width: 44px;"></div> 
 </header>
 
 <div id="app-container">
