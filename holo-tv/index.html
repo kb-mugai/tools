@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ホロメンTV|非公式hololiveJPメンバー専用TV風アプリ</title>
+    <meta name="description" content="hololiveJPメンバーに限定したシンプル非公式TV風アプリ。視聴と番組表機能。">
+<style>
+        :root {
+            --bg: #0f0f0f;
+            --accent: #00d4ff;
+            --header-h: 50px;
+            --ch-width: 160px;
+            --time-w: 70px;
+            --sticky-top-h: 150px; 
+            --slot-h: 120px;
+            --full-h: 100dvh; 
+        }
+
+        /* 1. 全要素の計算を「境界線込み」に統一 */
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body, html { margin: 0; padding: 0; height: var(--full-h); background: var(--bg); color: #fff; font-family: sans-serif; overflow: hidden; }
+
+        header {
+            height: var(--header-h); background: #1a1a1a; display: flex;
+            align-items: center; justify-content: space-between; padding: 0 10px;
+            border-bottom: 1px solid #333; z-index: 2000;
+        }
+        .nav-group { display: flex; gap: 8px; align-items: center; }
+        button { background: #333; border: 1px solid #444; color: #fff; padding: 6px 12px; cursor: pointer; border-radius: 6px; font-size: 11px; font-weight: bold; }
+        button.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+        #app-container { display: flex; height: calc(var(--full-h) - var(--header-h)); width: 100%; position: relative; }
+
+        #player-section { flex: 1; background: #000; position: relative; z-index: 10; overflow: hidden; }
+        #chat-area { width: 320px; background: #000; border-left: 1px solid #222; z-index: 5; }
+        #epg-section { display: none; flex: 1; overflow: auto; width: 100%; height: 100%; position: relative; background: var(--bg); }
+        
+        #video-iframe { width: 100%; height: 100%; border: none; }
+
+        body.mode-epg #epg-section { display: block; }
+
+        /* PC & スマホ横のEPGモード: 25% 小窓 */
+        @media screen and (min-width: 769px), (orientation: landscape) {
+            body.mode-epg #player-section {
+                position: fixed; bottom: 15px; right: 15px; 
+                width: 25vw; min-width: 180px; aspect-ratio: 16/9;
+                z-index: 1500; border: 2px solid #444; box-shadow: 0 10px 30px #000; flex: none;
+                pointer-events: auto;
+            }
+            body.mode-epg #chat-area { display: none; }
+        }
+
+        /* スマホ縦 */
+        @media screen and (max-width: 768px) and (orientation: portrait) {
+            #app-container { flex-direction: column; }
+            #player-section { height: 30vh; flex: none; }
+            #chat-area { width: 100%; flex: 1; border-left: none; border-top: 1px solid #222; overflow: hidden; }
+            body.mode-watch #epg-section { display: none; }
+            body.mode-epg #chat-area { display: none; }
+            body.mode-epg #epg-section { display: block; flex: 1; }
+            body.mode-epg #player-section { position: relative; width: 100%; bottom: auto; right: auto; aspect-ratio: auto; height: 30vh; }
+        }
+
+        /* スマホ横・視聴画面：チャットなし全画面 */
+        @media screen and (max-width: 950px) and (orientation: landscape) {
+            header { height: 40px; }
+            #app-container { height: calc(var(--full-h) - 40px); }
+            body.mode-watch #chat-area { display: none !important; }
+            body.mode-watch #player-section { width: 100vw !important; height: 100%; flex: none; }
+            #video-iframe { width: 100%; height: 100%; object-fit: contain; }
+        }
+
+        /* --- EPG内部デザイン修正 --- */
+        #epg-wrapper { display: inline-block; position: relative; min-width: 100%; vertical-align: top; }
+        
+        /* 2. 時刻軸のborderを「内側」に */
+        #epg-times-axis { position: sticky; left: 0; width: var(--time-w); background: #151515; border-right: 1px solid #333; z-index: 100; float: left; }
+        
+        .time-axis-header {
+            height: var(--sticky-top-h); background: #1a1a1a; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; color: var(--accent); font-weight: bold; font-size: 11px;
+            border-bottom: 2px solid #f33; position: sticky; top: 0; z-index: 110;
+        }
+
+        /* 3. マスの高さを120px（線込み）に固定 */
+        .time-slot { height: var(--slot-h); display: flex; align-items: center; justify-content: center; font-size: 10px; border-bottom: 1px solid #333; }
+
+        #epg-sticky-header { position: sticky; top: 0; z-index: 90; display: flex; background: var(--bg); margin-left: var(--time-w); width: fit-content;}
+        
+        .ch-col-header { width: var(--ch-width); min-width: var(--ch-width); border-right: 1px solid #333; flex-shrink: 0; }
+        .ch-name-box { height: 50px; background: #1a1a1a; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #333; font-size: 10px; }
+        
+        /* 4. NOWエリアの高さ 100px（線込み） */
+        .now-stream-box {
+            height: 100px; background: #200; border-bottom: 2px solid #f33; padding: 8px; font-size: 10px; cursor: pointer;
+            overflow: hidden; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: bold;
+        }
+        .now-stream-box.member { background: #003311; border-bottom-color: #00ff66; color: #00ff66; }
+        .now-stream-box.empty { background: #111; border-bottom-color: #333; color: #444; }
+
+        /* 5. 配信予定エリアの背景グリッド：線の重なりを解消 */
+        #epg-grid-body { position: relative; margin-left: var(--time-w); background: #0f0f0f; min-height: 2880px; }
+        #epg-grid-body::before {
+            content: ""; position: absolute; inset: 0;
+            background-image: linear-gradient(to bottom, #333 1px, transparent 1px);
+            background-size: 100% var(--slot-h); 
+            background-position: 0 -1px; /* 最初の1pxを上にずらしてborderと同期 */
+            pointer-events: none; z-index: 1;
+        }
+        #epg-grid-body::after {
+            content: ""; position: absolute; inset: 0;
+            background-image: linear-gradient(to right, #333 1px, transparent 1px);
+            background-size: var(--ch-width) 100%; 
+            background-position: -1px 0; /* 左の1pxをずらしてborderと同期 */
+            pointer-events: none; z-index: 1;
+        }
+
+        /* メン限ガードを動画の上に重ねる設定 */
+#member-guard {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.85); /* 背景を暗く */
+    z-index: 1000; /* iframeより上に */
+    display: none; /* JSでflexに切り替え */
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    text-align: center;
+    backdrop-filter: blur(4px); /* 背景をぼかすとおしゃれ */
+}
+        .stream-card {
+            position: absolute; width: calc(var(--ch-width) - 10px); margin: 0 5px; padding: 8px; border-radius: 4px;
+            font-size: 10px; cursor: pointer; background: #222; border-left: 3px solid var(--accent); color: #eee; 
+            overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 10;
+        }
+    </style>
+</head>
+<body class="mode-watch">
+
+<header>
+    <div class="nav-group">
+        <button id="btn-watch" class="active" onclick="setMode('watch')">WATCH</button>
+        <button id="btn-epg" onclick="setMode('epg')">EPG</button>
+    </div>
+    <div class="nav-group">
+        <button onclick="zap(-1)">◀</button>
+        <span id="current-ch-name" style="font-size: 10px; color: var(--accent); min-width: 60px; text-align: center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">---</span>
+        <button onclick="zap(1)">▶</button>
+    </div>
+    <button onclick="openYouTube()" style="border-color: #f00; color: #f00;">YouTube</button>
+</header>
+
+<div id="app-container">
+    <div id="player-section">
+        <div id="video-container" style="width:100%; height:100%;">
+            <div id="member-guard">
+                <div style="font-size: 40px; margin-bottom: 10px;">🔒</div>
+                <div id="guard-title" style="color:#00ff66; margin-bottom:15px; font-size:11px; font-weight:bold;">メン限</div>
+                <button onclick="openYouTube()" style="background:#f00; border:none; padding:10px 20px; border-radius:5px; color:#fff; font-weight:bold; cursor:pointer;">YouTubeで見る</button>
+                <button onclick="closeGuard()" style="margin-top:15px; background:none; border:none; color:#999; text-decoration:underline; cursor:pointer;">閉じる</button>
+            </div>
+            <iframe id="video-iframe" src="" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        </div>
+    </div>
+    <div id="chat-area"><iframe id="chat-iframe" style="width:100%; height:100%; border:none;"></iframe></div>
+    
+    <div id="epg-section">
+        <div id="epg-wrapper">
+            <div id="epg-times-axis">
+                <div class="time-axis-header"><div id="epg-date">--/--</div><div style="margin-top:5px;">NOW</div></div>
+                <div id="epg-times-list"></div>
+            </div>
+            <div id="epg-sticky-header"></div>
+            <div id="epg-grid-body"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // デプロイした最新のURLに差し替えてください
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbzBS93O5OnbG4FiQzCT0Vuf_Y6kxKxIBu6Kb4gQsNbdS5YZzgD1eCtKL29Vm0trtGPlVA/exec";
+    const ALLOWED_GENS = ["0th Gen", "1st Gen", "2nd Gen", "Gamers", "3rd Gen", "4th Gen", "5th Gen", "6th Gen", "Secret Society holoX", "DEV_IS ReGLOSS", "DEV_IS FLOW\\s?GLOW"];
+    
+    let cachedData, orderedIds = [], channels = {}, currentVideoId = "";
+    let isFirstPlay = true;
+
+    async function loadEPG() {
+        try {
+            // 読み込み中であることがわかるように、コンソールかUIに表示
+            console.log("Fetching EPG data...");
+            const res = await fetch(GAS_URL);
+            cachedData = await res.json();
+            
+            // データが空（エラー時など）の対策
+            if (!cachedData || cachedData.length === 0) {
+                console.warn("No data received from GAS");
+                return;
+            }
+            
+            renderEPG(cachedData);
+        } catch(e) { 
+            console.error("EPG Load Error:", e); 
+        }
+    }
+
+    function checkMemberOnly(title) { return /メン限|メンバー限定|Member Only|Membership/i.test(title); }
+
+    function renderEPG(data) {
+        const stickyHeader = document.getElementById('epg-sticky-header');
+        const gridBody = document.getElementById('epg-grid-body');
+        const timesList = document.getElementById('epg-times-list');
+        const dateDisplay = document.getElementById('epg-date');
+        
+        stickyHeader.innerHTML = ''; gridBody.innerHTML = ''; timesList.innerHTML = '';
+        const now = new Date();
+        dateDisplay.innerText = `${now.getMonth()+1}/${now.getDate()}`;
+        const startH = now.getHours();
+
+        channels = {};
+        data.forEach(s => {
+            const sub = (s.channel.suborg || "").toLowerCase();
+            if (sub.includes("holostars") || sub.includes("english") || sub.includes("indonesia")) return;
+            const genIndex = ALLOWED_GENS.findIndex(g => new RegExp(g.toLowerCase()).test(sub));
+            if (genIndex !== -1) {
+                if (!channels[s.channel.id]) channels[s.channel.id] = { info: s.channel, streams: [], genScore: genIndex };
+                channels[s.channel.id].streams.push(s);
+            }
+        });
+
+        // 1. ソート順の判定も「時間基準」を考慮
+        orderedIds = Object.keys(channels).sort((a, b) => {
+            const isLive = (ch) => ch.streams.some(s => {
+                if (s.status === 'live') return true;
+                const st = new Date(s.start_actual || s.start_scheduled);
+                return (now >= st && (now - st) < 3 * 60 * 60 * 1000);
+            });
+            const isLiveA = isLive(channels[a]) ? 1 : 0;
+            const isLiveB = isLive(channels[b]) ? 1 : 0;
+            if (isLiveA !== isLiveB) return isLiveB - isLiveA;
+            return channels[a].genScore - channels[b].genScore;
+        });
+
+        for(let i=0; i<24; i++) {
+            const div = document.createElement('div');
+            div.className = 'time-slot';
+            div.innerText = `${(startH + i) % 24}:00`;
+            timesList.appendChild(div);
+        }
+
+        gridBody.style.width = `${orderedIds.length * 160}px`;
+
+        orderedIds.forEach((chId, idx) => {
+            const ch = channels[chId];
+            const chX = idx * 160;
+            const col = document.createElement('div');
+            col.className = 'ch-col-header';
+            const nameBox = document.createElement('div');
+            nameBox.className = 'ch-name-box';
+            nameBox.innerHTML = `<img src="${ch.info.photo}" style="width:18px;height:18px;border-radius:50%;margin-right:4px;">${ch.info.name.substring(0,5)}`;
+            
+            // 2. NOW判定を「ステータス」＋「経過時間」に強化
+            const live = ch.streams.find(s => {
+                if (s.status === 'live') return true;
+                const st = new Date(s.start_actual || s.start_scheduled);
+                return (now >= st && (now - st) < 3 * 60 * 60 * 1000);
+            });
+
+            const nowBox = document.createElement('div');
+            const member = live && checkMemberOnly(live.title);
+            nowBox.className = 'now-stream-box' + (live ? (member ? ' member' : '') : ' empty');
+            nowBox.innerHTML = live ? (member ? '🔒 ' : '') + live.title : '---';
+            if (live) nowBox.onclick = () => play(live.id, ch.info.name, live.title, member);
+            
+            col.appendChild(nameBox);
+            col.appendChild(nowBox);
+            stickyHeader.appendChild(col);
+
+            ch.streams.forEach(s => {
+                // 3. NOW枠に表示したものは予定表(カード)には出さない
+                if (live && s.id === live.id) return;
+                
+                const st = new Date(s.start_actual || s.start_scheduled);
+                let hourDiff = st.getHours() - startH;
+                if (hourDiff < 0) hourDiff += 24; 
+                let topPos = (hourDiff * 120) + (st.getMinutes() * 2);
+
+                if (hourDiff < 24) {
+                    const card = document.createElement('div');
+                    card.className = 'stream-card';
+                    card.style.left = `${chX}px`;
+                    card.style.top = `${topPos}px`;
+                    card.style.height = `90px`;
+                    const dateStr = `${st.getMonth()+1}/${st.getDate()} ${st.getHours()}:${st.getMinutes().toString().padStart(2,'0')}`;
+                    card.innerHTML = `<div style="color:var(--accent);font-weight:bold;font-size:9px;margin-bottom:4px;">${dateStr}</div>${s.title}`;
+                    card.onclick = () => play(s.id, ch.info.name, s.title, checkMemberOnly(s.title));
+                    gridBody.appendChild(card);
+                }
+            });
+        });
+
+        if (isFirstPlay && orderedIds.length > 0) {
+            const firstId = orderedIds[0];
+            // ここも時間基準で探す
+            const first = channels[firstId].streams.find(s => {
+                if (s.status === 'live') return true;
+                const st = new Date(s.start_actual || s.start_scheduled);
+                return (now >= st && (now - st) < 3 * 60 * 60 * 1000);
+            }) || channels[firstId].streams[0];
+            
+            if (first) play(first.id, channels[firstId].info.name, first.title, checkMemberOnly(first.title));
+            isFirstPlay = false;
+        }
+    }
+
+    function play(id, name, title, member) {
+        currentVideoId = id;
+        document.getElementById('video-iframe').src = `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&enablejsapi=1`;
+        document.getElementById('chat-iframe').src = `https://www.youtube.com/live_chat?v=${id}&embed_domain=${window.location.hostname}`;
+        document.getElementById('current-ch-name').innerText = name;
+        if (member) {
+            document.getElementById('guard-title').innerText = title;
+            document.getElementById('member-guard').style.display = 'flex';
+        } else {
+            closeGuard();
+        }
+    }
+
+    function closeGuard() { document.getElementById('member-guard').style.display = 'none'; }
+
+function zap(dir) {
+        // 「今放送中（または時間的に始まっているはず）」のチャンネルを抽出
+        const lives = orderedIds.filter(id => {
+            return channels[id].streams.some(s => {
+                if (s.status === 'live') return true;
+                const st = new Date(s.start_actual || s.start_scheduled);
+                const nowTime = new Date();
+                return (nowTime >= st && (nowTime - st) < 3 * 60 * 60 * 1000);
+            });
+        });
+
+        if (lives.length === 0) return;
+        
+        let idx = lives.findIndex(id => channels[id].streams.some(s => s.id === currentVideoId));
+        idx = (idx === -1) ? 0 : (idx + dir + lives.length) % lives.length;
+        
+        // ターゲットの配信情報を取得
+        const targetCh = channels[lives[idx]];
+        const targetStream = targetCh.streams.find(s => {
+            if (s.status === 'live') return true;
+            const st = new Date(s.start_actual || s.start_scheduled);
+            return (new Date() >= st);
+        }) || targetCh.streams[0];
+
+        play(targetStream.id, targetCh.info.name, targetStream.title, checkMemberOnly(targetStream.title));
+    }
+
+    function setMode(m) {
+        document.body.className = 'mode-' + m;
+        document.getElementById('btn-watch').classList.toggle('active', m === 'watch');
+        document.getElementById('btn-epg').classList.toggle('active', m === 'epg');
+    }
+
+    function openYouTube() { if (currentVideoId) window.open(`https://www.youtube.com/watch?v=${currentVideoId}`, '_blank'); }
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') zap(-1);
+        if (e.key === 'ArrowRight') zap(1);
+    });
+
+    // 起動時に実行
+    loadEPG();
+    
+    // 定期更新：5分ごと (180,000ミリ秒)
+    // GAS側で15分枠判定をしているので、ここで頻繁に叩いても安全です。
+    setInterval(loadEPG, 1000 * 60 * 5); 
+</script>
+<script data-goatcounter="https://kb-mugai.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</body>
+</html>
