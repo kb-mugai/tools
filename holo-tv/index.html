@@ -12,10 +12,10 @@
             --bg: #0f0f0f;
             --accent: #00d4ff;
             --header-h: 50px;
-            --ch-width: 160px;
+            --ch-width: 100px;
             --time-w: 70px;
             --sticky-top-h: 150px; 
-            --slot-h: 120px;
+            --slot-h: 60px;
             --full-h: 100dvh; 
         }
 
@@ -153,11 +153,29 @@
             text-align: center;
             backdrop-filter: blur(4px); /* 背景をぼかすとおしゃれ */
         }
-        .stream-card {
-            position: absolute; width: calc(var(--ch-width) - 10px); margin: 0 5px; padding: 8px; border-radius: 4px;
-            font-size: 10px; cursor: pointer; background: #222; border-left: 3px solid var(--accent); color: #eee; 
-            overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.5); z-index: 10;
-        }
+.stream-card {
+    position: absolute;
+    width: calc(var(--ch-width) - 4px); /* 左右余白を各2pxに */
+    margin: 0 2px;
+    
+    /* 縦60pxのグリッドに対して、58pxでほぼフル活用 */
+    height: 58px; 
+    
+    /* 上下のパディングをさらに削る（2pxあれば十分） */
+    padding: 2px 4px; 
+    
+    border-radius: 2px;
+    font-size: 9px;
+    line-height: 1.1;
+    cursor: pointer;
+    background: #222;
+    border-left: 3px solid var(--accent); /* ホロライブカラーの縦棒 */
+    color: #eee;
+    overflow: hidden;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+    z-index: 10;
+    word-break: break-all;
+}
 
         /* --- 透明ガードの統合設定 --- */
         
@@ -238,6 +256,11 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbzBS93O5OnbG4FiQzCT0Vuf
     let cachedData, orderedIds = [], channels = {}, currentVideoId = "";
     let isFirstPlay = true;
 
+// 指定した文字数（len）を超えたら「...」にする関数
+function truncate(str, len) {
+    if (!str) return "";
+    return str.length <= len ? str : str.substr(0, len) + "...";
+}
     async function loadEPG() {
         try {
             console.log("Fetching EPG data...");
@@ -302,11 +325,11 @@ function renderEPG(data) {
         timesList.appendChild(div);
     }
 
-    gridBody.style.width = `${orderedIds.length * 160}px`;
+    gridBody.style.width = `${orderedIds.length * 100}px`;
 
     orderedIds.forEach((chId, idx) => {
         const ch = channels[chId];
-        const chX = idx * 160;
+        const chX = idx * 100;
         const col = document.createElement('div');
         col.className = 'ch-col-header';
         const nameBox = document.createElement('div');
@@ -322,7 +345,8 @@ function renderEPG(data) {
         const nowBox = document.createElement('div');
         const member = live && checkMemberOnly(live.title);
         nowBox.className = 'now-stream-box' + (live ? (member ? ' member' : '') : ' empty');
-        nowBox.innerHTML = live ? (member ? '🔒 ' : '') + live.title : '---';
+const displayTitle = live ? truncate(live.title, 40) : '---';
+nowBox.innerHTML = (live && member ? '🔒 ' : '') + displayTitle;
         if (live) nowBox.onclick = () => play(live.id, ch.info.name, live.title, member);
         
         col.appendChild(nameBox);
@@ -341,15 +365,20 @@ function renderEPG(data) {
             // かつ、現在より過去すぎるものは除外（例えば30分以上前の予定は出さない等、好みで調整可能）
             if (diffMs >= 0 && diffMs < 24 * 60 * 60 * 1000) {
                 // ミリ秒を分に直し、1分 = 2px (1時間=120px) で配置
-                const topPos = (diffMs / (1000 * 60)) * 2;
+                const topPos = (diffMs / (1000 * 60)) * 1;
 
                 const card = document.createElement('div');
                 card.className = 'stream-card';
                 card.style.left = `${chX}px`;
                 card.style.top = `${topPos}px`;
-                card.style.height = `90px`;
+                card.style.height = `60px`;
                 const dateStr = `${st.getMonth()+1}/${st.getDate()} ${st.getHours()}:${st.getMinutes().toString().padStart(2,'0')}`;
-                card.innerHTML = `<div style="color:var(--accent);font-weight:bold;font-size:9px;margin-bottom:4px;">${dateStr}</div>${s.title}`;
+
+                const displayTitle = truncate(s.title, 40);
+card.innerHTML = `
+    <div style="color:var(--accent);font-weight:bold;font-size:9px;margin-bottom:4px;">${dateStr}</div>
+    <div style="line-height:1.2; word-break: break-all;">${displayTitle}</div>
+`;
                 card.onclick = () => play(s.id, ch.info.name, s.title, checkMemberOnly(s.title));
                 gridBody.appendChild(card);
             }
