@@ -5,7 +5,7 @@
 <link rel="apple-touch-icon" href="icon.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ホロメンTV|非公式hololiveJPメンバー専用TV風アプリ</title>
+    <title>ホロメンTV ver1.0.5|非公式ホロライブJPメンバー専用TV風アプリ</title>
     <meta name="description" content="hololiveJPメンバーに限定したシンプル非公式TV風アプリ。視聴と番組表機能。">
 <style>
         :root {
@@ -112,6 +112,13 @@
         
         .ch-col-header { width: var(--ch-width); min-width: var(--ch-width); border-right: 1px solid #333; flex-shrink: 0; }
         .ch-name-box { height: 50px; background: #1a1a1a; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #333; font-size: 10px; }
+        /* EPGのチャンネル名ボックスが「視聴中」の時のスタイル */
+.ch-name-box.active-ch {
+    background: var(--accent) !important; /* アクセントカラー（水色）に変更 */
+    color: #000 !important; /* 文字を黒にして読みやすく */
+    font-weight: bold;
+    box-shadow: inset 0 0 10px rgba(255,255,255,0.5);
+}
         
         /* 4. NOWエリアの高さ 100px（線込み） */
         .now-stream-box {
@@ -296,15 +303,25 @@ function renderEPG(data) {
     gridStartTime.setMinutes(0, 0, 0);
 
     channels = {};
-    data.forEach(s => {
-        const sub = (s.channel.suborg || "").toLowerCase();
-        if (sub.includes("holostars") || sub.includes("english") || sub.includes("indonesia")) return;
-        const genIndex = ALLOWED_GENS.findIndex(g => new RegExp(g.toLowerCase()).test(sub));
-        if (genIndex !== -1) {
-            if (!channels[s.channel.id]) channels[s.channel.id] = { info: s.channel, streams: [], genScore: genIndex };
-            channels[s.channel.id].streams.push(s);
+data.forEach(s => {
+    // 【追加】ホロライブ所属（JP/EN/ID含む全体）以外は即座に除外
+    if (s.channel.org !== "Hololive") return;
+
+    const sub = (s.channel.suborg || "").toLowerCase();
+    
+    // ホロスターズや海外勢を除外
+    if (sub.includes("holostars") || sub.includes("english") || sub.includes("indonesia")) return;
+
+    // 世代（ALLOWED_GENS）の判定
+    const genIndex = ALLOWED_GENS.findIndex(g => new RegExp(g.toLowerCase()).test(sub));
+    
+    if (genIndex !== -1) {
+        if (!channels[s.channel.id]) {
+            channels[s.channel.id] = { info: s.channel, streams: [], genScore: genIndex };
         }
-    });
+        channels[s.channel.id].streams.push(s);
+    }
+});
 
     orderedIds = Object.keys(channels).sort((a, b) => {
         const isLive = (ch) => ch.streams.some(s => {
@@ -332,8 +349,15 @@ function renderEPG(data) {
         const chX = idx * 100;
         const col = document.createElement('div');
         col.className = 'ch-col-header';
+
         const nameBox = document.createElement('div');
         nameBox.className = 'ch-name-box';
+
+        const currentPlayingName = document.getElementById('current-ch-name').innerText;
+    if (ch.info.name === currentPlayingName) {
+        nameBox.classList.add('active-ch'); // 強調用クラスを付与
+    }
+
         nameBox.innerHTML = `<img src="${ch.info.photo}" style="width:18px;height:18px;border-radius:50%;margin-right:4px;">${ch.info.name.substring(0,5)}`;
         
         const live = ch.streams.find(s => {
@@ -412,6 +436,16 @@ card.innerHTML = `
 
         document.getElementById('video-iframe').src = `https://www.youtube.com/embed/${id}?autoplay=1&playsinline=1&rel=0&enablejsapi=1`;
         document.getElementById('chat-iframe').src = `https://www.youtube.com/live_chat?v=${id}&embed_domain=${window.location.hostname}`;
+
+        document.querySelectorAll('.ch-name-box').forEach(el => {
+        el.classList.remove('active-ch');
+        // 表示されているテキストが切り替えた名前と一致するか判定
+        // (substring(0,5)で描画されているので、前方一致や完全一致でチェック)
+        if (el.innerText.trim() === name.substring(0,5).trim()) {
+            el.classList.add('active-ch');
+        }
+    });
+        
         document.getElementById('current-ch-name').innerText = name;
         if (member) {
             document.getElementById('guard-title').innerText = title;
