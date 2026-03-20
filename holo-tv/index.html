@@ -5,7 +5,7 @@
 <link rel="apple-touch-icon" href="icon.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ホロザッパー ver1.0.9beta3|試験アプデ継続中|非公式ホロライブJPメンバー専用TV風アプリ</title>
+    <title>ホロザッパー ver1.0.10beta1|試験アプデ継続中|非公式ホロライブJPメンバー専用TV風アプリ</title>
     <meta name="description" content="hololiveJPメンバーに限定したシンプル非公式TV風アプリ。視聴と番組表機能。">
 <style>
         :root {
@@ -434,7 +434,7 @@ function renderEPG(data) {
         const nameBox = document.createElement('div');
         nameBox.className = 'ch-name-box';
         if (ch.info.name === document.getElementById('current-ch-name').innerText) nameBox.classList.add('active-ch');
-        nameBox.innerHTML = `<img src="${ch.info.photo}" style="width:18px;height:18px;border-radius:50%;margin-right:4px;">${ch.info.name.substring(0,10)}`;
+        nameBox.innerHTML = `<img src="${ch.info.photo}" style="width:18px;height:18px;border-radius:50%;margin-right:4px;">${ch.info.name.substring(0,10)}`; // ch名文字数
         
         const live = ch.streams.find(s => {
             if (s.status === 'live') return true;
@@ -514,8 +514,8 @@ function play(id, name, title, member) {
         document.querySelectorAll('.ch-name-box').forEach(el => {
         el.classList.remove('active-ch');
         // 表示されているテキストが切り替えた名前と一致するか判定
-        // (substring(0,5)で描画されているので、前方一致や完全一致でチェック)
-        if (el.innerText.trim() === name.substring(0,5).trim()) {
+        // (substring(0,10)で描画されているので、前方一致や完全一致でチェック)
+        if (el.innerText.trim() === name.substring(0,10).trim()) { // 必ずチャンネル名のtrimと合わせること
             el.classList.add('active-ch');
         }
     });
