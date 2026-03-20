@@ -5,7 +5,7 @@
 <link rel="apple-touch-icon" href="icon.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ホロメンザッパー ver1.0.7|試験アプデ継続中|非公式ホロライブJPメンバー専用TV風アプリ</title>
+    <title>ホロザッパー ver1.0.9beta3|試験アプデ継続中|非公式ホロライブJPメンバー専用TV風アプリ</title>
     <meta name="description" content="hololiveJPメンバーに限定したシンプル非公式TV風アプリ。視聴と番組表機能。">
 <style>
         :root {
@@ -131,7 +131,7 @@
         .now-stream-box.empty { background: #111; border-bottom-color: #333;  }
 
         /* 5. 配信予定エリアの背景グリッド：線の重なりを解消 */
-        #epg-grid-body { position: relative; margin-left: var(--time-w); background: #0f0f0f; min-height: 2880px; }
+        #epg-grid-body { position: relative; margin-left: var(--time-w); background: #0f0f0f; }
         #epg-grid-body::before {
             content: ""; position: absolute; inset: 0;
             background-image: linear-gradient(to bottom, #333 1px, transparent 1px);
@@ -300,49 +300,127 @@ function renderEPG(data) {
     dateDisplay.innerText = `${now.getMonth()+1}/${now.getDate()}`;
     const startH = now.getHours();
 
-    // グリッド開始基準時刻（現在の「時」の00分00秒）
     const gridStartTime = new Date(now);
     gridStartTime.setMinutes(0, 0, 0);
 
     channels = {};
-data.forEach(s => {
-    // 【追加】ホロライブ所属（JP/EN/ID含む全体）以外は即座に除外
-    if (s.channel.org !== "Hololive") return;
-
-    const sub = (s.channel.suborg || "").toLowerCase();
-    
-    // ホロスターズや海外勢を除外
-    if (sub.includes("holostars") || sub.includes("english") || sub.includes("indonesia")) return;
-
-    // 世代（ALLOWED_GENS）の判定
-    const genIndex = ALLOWED_GENS.findIndex(g => new RegExp(g.toLowerCase()).test(sub));
-    
-    if (genIndex !== -1) {
-        if (!channels[s.channel.id]) {
-            channels[s.channel.id] = { info: s.channel, streams: [], genScore: genIndex };
+    data.forEach(s => {
+        if (s.channel.org !== "Hololive") return;
+        const sub = (s.channel.suborg || "").toLowerCase();
+        if (sub.includes("holostars") || sub.includes("english") || sub.includes("indonesia")) return;
+        const genIndex = ALLOWED_GENS.findIndex(g => new RegExp(g.toLowerCase()).test(sub));
+        if (genIndex !== -1) {
+            if (!channels[s.channel.id]) {
+                channels[s.channel.id] = { info: s.channel, streams: [], genScore: genIndex };
+            }
+            channels[s.channel.id].streams.push(s);
         }
-        channels[s.channel.id].streams.push(s);
-    }
-});
+    });
 
+    let maxEndDate = new Date(now); 
+    Object.values(channels).forEach(ch => {
+        ch.streams.forEach(s => {
+            const streamDate = new Date(s.start_actual || s.start_scheduled);
+            if (streamDate > maxEndDate) maxEndDate = streamDate;
+        });
+    });
+
+    // --- 1. 表示すべき時間帯を判定 ---
+    const hourMap = {};
+    const gridStartTimeForMap = new Date(gridStartTime); 
+    Object.values(channels).forEach(ch => {
+        ch.streams.forEach(s => {
+            const st = new Date(s.start_actual || s.start_scheduled);
+            const et = new Date(st.getTime() + 60 * 60 * 1000);
+            let loopTime = new Date(st);
+            loopTime.setMinutes(0, 0, 0);
+
+            while (loopTime < et) {
+                const hourDiff = loopTime - gridStartTimeForMap;
+                if (hourDiff >= 0) {
+                    const hourIndex = Math.floor(hourDiff / (1000 * 60 * 60));
+                    hourMap[hourIndex] = true;
+                }
+                loopTime.setHours(loopTime.getHours() + 1);
+            }
+        });
+    });
+
+    const displayEndDate = new Date(maxEndDate);
+    displayEndDate.setHours(displayEndDate.getHours() + 1, 0, 0, 0);
+    const totalHours = Math.ceil((displayEndDate - gridStartTime) / (1000 * 60 * 60));
+
+    // --- 2. 時刻軸と背景グリッドの動的生成 ---
+    let currentY = 0;
+    const hourSlotHeight = 60; // --slot-h
+    const minuteToY = [];
+    let lastDateValue = -1;
+    let isFirstSlotAfterDateChange = false; 
+
+    for (let i = 0; i < totalHours; i++) {
+        const loopDate = new Date(gridStartTime);
+        loopDate.setHours(gridStartTime.getHours() + i);
+        const hour = loopDate.getHours();
+        const currentDateValue = loopDate.getDate();
+
+        if (lastDateValue !== -1 && lastDateValue !== currentDateValue) {
+            isFirstSlotAfterDateChange = true;
+        }
+
+        if (hourMap[i]) {
+            // 背景色の決定 (偶数日・奇数日)
+            const isEvenDay = currentDateValue % 2 === 0;
+            const bgColor = isEvenDay ? 'rgba(0, 50, 100, 0.12)' : 'transparent';
+            
+            // メイングリッド側の背景生成
+            if (bgColor !== 'transparent') {
+                const bg = document.createElement('div');
+                bg.style.cssText = `position: absolute; left: 0; top: ${currentY}px; width: 100%; height: ${hourSlotHeight}px; background: ${bgColor}; z-index: 0; pointer-events: none;`;
+                gridBody.appendChild(bg);
+            }
+
+            // 時刻ラベルの生成
+            const div = document.createElement('div');
+            div.className = 'time-slot';
+            
+            // 【変更箇所】時刻枠自体の背景色をグリッドと合わせる
+            div.style.backgroundColor = bgColor;
+
+            if (i === 0 || hour === 0 || isFirstSlotAfterDateChange) {
+                const dateText = `${loopDate.getMonth() + 1}/${currentDateValue}`;
+                const timeText = (hour === 0) ? `0:00` : `${hour}:00`;
+                div.innerHTML = `<div style="font-size:10px; color:var(--accent); font-weight:bold;">${dateText}</div><div>${timeText}</div>`;
+                div.style.cssText += "height:var(--slot-h); display:flex; flex-direction:column; justify-content:center; line-height:1.1;";
+                // 日付ラベル部分は少しだけ暗くして視認性を確保
+                div.style.backgroundColor = isEvenDay ? 'rgba(0, 30, 70, 0.25)' : 'rgba(255, 255, 255, 0.03)';
+                
+                isFirstSlotAfterDateChange = false; 
+            } else {
+                div.innerText = `${hour}:00`;
+            }
+            timesList.appendChild(div);
+
+            for (let m = 0; m < 60; m++) { minuteToY.push(currentY + m); }
+            currentY += hourSlotHeight;
+        } else {
+            for (let m = 0; m < 60; m++) { minuteToY.push(-1); }
+        }
+        lastDateValue = currentDateValue;
+    }
+    gridBody.style.height = `${currentY}px`;
+
+    // --- 3. チャンネル並び替えと描画 (以下変更なし) ---
     orderedIds = Object.keys(channels).sort((a, b) => {
         const isLive = (ch) => ch.streams.some(s => {
             if (s.status === 'live') return true;
             const st = new Date(s.start_actual || s.start_scheduled);
             return (now >= st && (now - st) < 3 * 60 * 60 * 1000);
         });
-        const isLiveA = isLive(channels[a]) ? 1 : 0;
-        const isLiveB = isLive(channels[b]) ? 1 : 0;
-        if (isLiveA !== isLiveB) return isLiveB - isLiveA;
+        const liveA = isLive(channels[a]) ? 1 : 0;
+        const liveB = isLive(channels[b]) ? 1 : 0;
+        if (liveA !== liveB) return liveB - liveA;
         return channels[a].genScore - channels[b].genScore;
     });
-
-    for(let i=0; i<24; i++) {
-        const div = document.createElement('div');
-        div.className = 'time-slot';
-        div.innerText = `${(startH + i) % 24}:00`;
-        timesList.appendChild(div);
-    }
 
     gridBody.style.width = `${orderedIds.length * 100}px`;
 
@@ -354,12 +432,7 @@ data.forEach(s => {
 
         const nameBox = document.createElement('div');
         nameBox.className = 'ch-name-box';
-
-        const currentPlayingName = document.getElementById('current-ch-name').innerText;
-    if (ch.info.name === currentPlayingName) {
-        nameBox.classList.add('active-ch'); // 強調用クラスを付与
-    }
-
+        if (ch.info.name === document.getElementById('current-ch-name').innerText) nameBox.classList.add('active-ch');
         nameBox.innerHTML = `<img src="${ch.info.photo}" style="width:18px;height:18px;border-radius:50%;margin-right:4px;">${ch.info.name.substring(0,5)}`;
         
         const live = ch.streams.find(s => {
@@ -369,76 +442,42 @@ data.forEach(s => {
         });
 
         const nowBox = document.createElement('div');
-        let nowBoxClass = 'now-stream-box';
-        let isMember = false;
-        let displayTitle = '---';
-        let prefix = '';
+        let nowBoxClass = 'now-stream-box', isMember = false, displayTitle = '---', prefix = '';
 
         if (live) {
             isMember = checkMemberOnly(live.title);
-            const titleLower = live.title.toLowerCase();
-            
-            if (isMember) {
-                nowBoxClass += ' member';
-                prefix = '🔒 ';
-            } else if (live.topic_id === '3d_stream' || titleLower.includes('3d') || titleLower.includes('３ｄ')) {
-                nowBoxClass += ' live3d';
-            } else if (live.topic_id === 'singing' || titleLower.includes('歌枠') || titleLower.includes('sing') || titleLower.includes('karaoke')) {
-                nowBoxClass += ' singing';
-            }
-            
+            const titleL = live.title.toLowerCase();
+            if (isMember) { nowBoxClass += ' member'; prefix = '🔒 '; }
+            else if (live.topic_id === '3d_stream' || titleL.includes('3d') || titleL.includes('３ｄ')) { nowBoxClass += ' live3d'; }
+            else if (live.topic_id === 'singing' || titleL.includes('歌枠') || titleL.includes('sing') || titleL.includes('karaoke')) { nowBoxClass += ' singing'; }
             displayTitle = truncate(live.title, 40);
             nowBox.onclick = () => play(live.id, ch.info.name, live.title, isMember);
-        } else {
-            nowBoxClass += ' empty';
-        }
+        } else { nowBoxClass += ' empty'; }
 
         nowBox.className = nowBoxClass;
         nowBox.innerHTML = prefix + displayTitle;
-        
-        col.appendChild(nameBox);
-        col.appendChild(nowBox);
+        col.appendChild(nameBox); col.appendChild(nowBox);
         stickyHeader.appendChild(col);
 
         ch.streams.forEach(s => {
             if (live && s.id === live.id) return;
-            
             const st = new Date(s.start_actual || s.start_scheduled);
+            const diffMin = Math.floor((st - gridStartTime) / (1000 * 60));
+            const topPos = (diffMin >= 0 && diffMin < minuteToY.length) ? minuteToY[diffMin] : -1;
             
-            // 【修正】グリッド開始時刻からのミリ秒差分を計算
-            const diffMs = st - gridStartTime;
-            
-            // 24時間（86400000ms）以内のものだけ表示
-            // かつ、現在より過去すぎるものは除外（例えば30分以上前の予定は出さない等、好みで調整可能）
-            if (diffMs >= 0 && diffMs < 24 * 60 * 60 * 1000) {
-                // ミリ秒を分に直し、1分 = 2px (1時間=120px) で配置
-                const topPos = (diffMs / (1000 * 60)) * 1;
-
+            if (topPos !== -1) {
                 const card = document.createElement('div');
                 card.className = 'stream-card';
-                
-                // --- ここから追加：配信タイプに応じてクラスを付与 ---
-                const titleLower = s.title.toLowerCase();
-                if (checkMemberOnly(s.title)) {
-                    card.classList.add('member');
-                } else if (s.topic_id === '3d_stream' || titleLower.includes('3d') || titleLower.includes('３ｄ')) {
-                    card.classList.add('live3d');
-                } else if (s.topic_id === 'singing' || titleLower.includes('歌枠') || titleLower.includes('sing') || titleLower.includes('karaoke')) {
-                    card.classList.add('singing');
-                }
-                // --- ここまで追加 ---
+                const titleL = s.title.toLowerCase();
+                const mem = checkMemberOnly(s.title);
+                if (mem) card.classList.add('member');
+                else if (s.topic_id === '3d_stream' || titleL.includes('3d') || titleL.includes('３ｄ')) card.classList.add('live3d');
+                else if (s.topic_id === 'singing' || titleL.includes('歌枠') || titleL.includes('sing') || titleL.includes('karaoke')) card.classList.add('singing');
 
-                card.style.left = `${chX}px`;
-                card.style.top = `${topPos}px`;
-                card.style.height = `60px`;
-                const dateStr = `${st.getMonth()+1}/${st.getDate()} ${st.getHours()}:${st.getMinutes().toString().padStart(2,'0')}`;
-
-                const displayTitle = truncate(s.title, 40);
-card.innerHTML = `
-    <div style="color:var(--accent);font-weight:bold;font-size:9px;margin-bottom:4px;">${dateStr}</div>
-    <div style="line-height:1.2; word-break: break-all;">${displayTitle}</div>
-`;
-                card.onclick = () => play(s.id, ch.info.name, s.title, checkMemberOnly(s.title));
+                card.style.cssText = `left:${chX}px; top:${topPos}px; height:60px;`;
+                const dateS = `${st.getMonth()+1}/${st.getDate()} ${st.getHours()}:${st.getMinutes().toString().padStart(2,'0')}`;
+                card.innerHTML = `<div style="color:var(--accent);font-weight:bold;font-size:9px;margin-bottom:4px;">${dateS}</div><div style="line-height:1.2; word-break:break-all;">${truncate(s.title, 40)}</div>`;
+                card.onclick = () => play(s.id, ch.info.name, s.title, mem);
                 gridBody.appendChild(card);
             }
         });
@@ -451,12 +490,11 @@ card.innerHTML = `
             const st = new Date(s.start_actual || s.start_scheduled);
             return (now >= st && (now - st) < 3 * 60 * 60 * 1000);
         }) || channels[firstId].streams[0];
-        
         if (first) play(first.id, channels[firstId].info.name, first.title, checkMemberOnly(first.title));
         isFirstPlay = false;
     }
 }
-    function play(id, name, title, member) {
+function play(id, name, title, member) {
         currentVideoId = id;
         const playerSection = document.getElementById('player-section');
         
