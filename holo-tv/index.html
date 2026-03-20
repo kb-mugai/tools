@@ -9,14 +9,14 @@
     <meta name="description" content="hololiveJPメンバーに限定したシンプル非公式TV風アプリ。視聴と番組表機能。">
 <style>
         :root {
-            --bg: #0f0f0f;
-            --accent: #00d4ff;
-            --header-h: 50px;
-            --ch-width: 100px;
-            --time-w: 70px;
-            --sticky-top-h: 150px; 
-            --slot-h: 60px;
-            --full-h: 100dvh; 
+            --bg: #0f0f0f; /*背景色*/
+            --accent: #00d4ff; /*アクセントカラー*/
+            --header-h: 50px; /*ヘッダー（切替ボタン・視聴中ch名エリア）の高さ*/
+            --ch-width: 100px; /*チャンネル名の幅*/
+            --time-w: 30px; /*時刻軸の幅*/
+            --sticky-top-h: 130px; /*時刻NOWエリアの高さ*/
+            --slot-h: 60px; /*各スロット高さ*/
+            --full-h: 100dvh; /*番組表自体の最大縦サイズ*/
         }
 
         /* 1. 全要素の計算を「境界線込み」に統一 */
@@ -111,7 +111,8 @@
         #epg-sticky-header { position: sticky; top: 0; z-index: 90; display: flex; background: var(--bg); margin-left: var(--time-w); width: fit-content;}
         
         .ch-col-header { width: var(--ch-width); min-width: var(--ch-width); border-right: 1px solid #333; flex-shrink: 0; }
-        .ch-name-box { height: 50px; background: #1a1a1a; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #333; font-size: 10px; }
+        .ch-name-box { height: 30px; background: #1a1a1a; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #333; font-size: 10px; 
+        }
         /* EPGのチャンネル名ボックスが「視聴中」の時のスタイル */
 .ch-name-box.active-ch {
     background: var(--accent) !important; /* アクセントカラー（水色）に変更 */
@@ -259,8 +260,8 @@
     </div>
 </div>
 <script>
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzBS93O5OnbG4FiQzCT0Vuf_Y6kxKxIBu6Kb4gQsNbdS5YZzgD1eCtKL29Vm0trtGPlVA/exec";
-    const ALLOWED_GENS = ["Official","0th Gen", "1st Gen", "2nd Gen", "Gamers", "3rd Gen", "4th Gen", "5th Gen", "6th Gen", "Secret Society holoX", "DEV_IS ReGLOSS", "DEV_IS FLOW\\s?GLOW"];
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwS7RwwL7n15B8LNEu3AK9P9pmghhVK2cKJ6S-PTR2M2eYAyiPztbCIKs1jM5Ob6uT_bA/exec";
+    const ALLOWED_GENS = ["0aOfficial","0dOfficial","0th Gen", "1st Gen", "2nd Gen", "Gamers", "3rd Gen", "4th Gen", "5th Gen", "6th Gen", "Secret Society holoX", "DEV_IS ReGLOSS", "DEV_IS FLOW\\s?GLOW"];
     
     let cachedData, orderedIds = [], channels = {}, currentVideoId = "";
     let isFirstPlay = true;
@@ -433,7 +434,7 @@ function renderEPG(data) {
         const nameBox = document.createElement('div');
         nameBox.className = 'ch-name-box';
         if (ch.info.name === document.getElementById('current-ch-name').innerText) nameBox.classList.add('active-ch');
-        nameBox.innerHTML = `<img src="${ch.info.photo}" style="width:18px;height:18px;border-radius:50%;margin-right:4px;">${ch.info.name.substring(0,5)}`;
+        nameBox.innerHTML = `<img src="${ch.info.photo}" style="width:18px;height:18px;border-radius:50%;margin-right:4px;">${ch.info.name.substring(0,10)}`;
         
         const live = ch.streams.find(s => {
             if (s.status === 'live') return true;
