@@ -5,7 +5,7 @@
 <link rel="apple-touch-icon" href="icon.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ホロメンTV ver1.0.5|非公式ホロライブJPメンバー専用TV風アプリ</title>
+    <title>ホロメンザッパー ver1.0.7|試験アプデ継続中|非公式ホロライブJPメンバー専用TV風アプリ</title>
     <meta name="description" content="hololiveJPメンバーに限定したシンプル非公式TV風アプリ。視聴と番組表機能。">
 <style>
         :root {
@@ -125,8 +125,10 @@
             height: 100px; background: #200; border-bottom: 2px solid #f33; padding: 8px; font-size: 10px; cursor: pointer;
             overflow: hidden; display: flex; align-items: center; justify-content: center; text-align: center; font-weight: bold;
         }
-        .now-stream-box.member { background: #003311; border-bottom-color: #00ff66; color: #00ff66; }
-        .now-stream-box.empty { background: #111; border-bottom-color: #333; color: #444; }
+        .now-stream-box.member { background: #003311; border-bottom-color: #00ff66;  }
+        .now-stream-box.singing { background: #33001a; border-bottom-color: #ff69b4;  }
+        .now-stream-box.live3d { background: #332a00; border-bottom-color: #ffd700;  }
+        .now-stream-box.empty { background: #111; border-bottom-color: #333;  }
 
         /* 5. 配信予定エリアの背景グリッド：線の重なりを解消 */
         #epg-grid-body { position: relative; margin-left: var(--time-w); background: #0f0f0f; min-height: 2880px; }
@@ -162,27 +164,27 @@
         }
 .stream-card {
     position: absolute;
-    width: calc(var(--ch-width) - 4px); /* 左右余白を各2pxに */
+    width: calc(var(--ch-width) - 4px);
     margin: 0 2px;
-    
-    /* 縦60pxのグリッドに対して、58pxでほぼフル活用 */
     height: 58px; 
-    
-    /* 上下のパディングをさらに削る（2pxあれば十分） */
     padding: 2px 4px; 
-    
     border-radius: 2px;
     font-size: 9px;
     line-height: 1.1;
     cursor: pointer;
     background: #222;
-    border-left: 3px solid var(--accent); /* ホロライブカラーの縦棒 */
+    border-left: 3px solid #f33; /* デフォルトを赤に */
     color: #eee;
     overflow: hidden;
     box-shadow: 0 2px 5px rgba(0,0,0,0.5);
     z-index: 10;
     word-break: break-all;
 }
+
+/* 配信種別ごとの色分け */
+.stream-card.member { border-left-color: #00ff66; }  /* メンバー限定: 緑 */
+.stream-card.live3d { border-left-color: #ffd700; }  /* 3Dライブ: 黄 */
+.stream-card.singing { border-left-color: #ff69b4; } /* 歌枠: ピンク */
 
         /* --- 透明ガードの統合設定 --- */
         
@@ -258,7 +260,7 @@
 </div>
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzBS93O5OnbG4FiQzCT0Vuf_Y6kxKxIBu6Kb4gQsNbdS5YZzgD1eCtKL29Vm0trtGPlVA/exec";
-    const ALLOWED_GENS = ["0th Gen", "1st Gen", "2nd Gen", "Gamers", "3rd Gen", "4th Gen", "5th Gen", "6th Gen", "Secret Society holoX", "DEV_IS ReGLOSS", "DEV_IS FLOW\\s?GLOW"];
+    const ALLOWED_GENS = ["Official","0th Gen", "1st Gen", "2nd Gen", "Gamers", "3rd Gen", "4th Gen", "5th Gen", "6th Gen", "Secret Society holoX", "DEV_IS ReGLOSS", "DEV_IS FLOW\\s?GLOW"];
     
     let cachedData, orderedIds = [], channels = {}, currentVideoId = "";
     let isFirstPlay = true;
@@ -367,11 +369,32 @@ data.forEach(s => {
         });
 
         const nowBox = document.createElement('div');
-        const member = live && checkMemberOnly(live.title);
-        nowBox.className = 'now-stream-box' + (live ? (member ? ' member' : '') : ' empty');
-const displayTitle = live ? truncate(live.title, 40) : '---';
-nowBox.innerHTML = (live && member ? '🔒 ' : '') + displayTitle;
-        if (live) nowBox.onclick = () => play(live.id, ch.info.name, live.title, member);
+        let nowBoxClass = 'now-stream-box';
+        let isMember = false;
+        let displayTitle = '---';
+        let prefix = '';
+
+        if (live) {
+            isMember = checkMemberOnly(live.title);
+            const titleLower = live.title.toLowerCase();
+            
+            if (isMember) {
+                nowBoxClass += ' member';
+                prefix = '🔒 ';
+            } else if (live.topic_id === '3d_stream' || titleLower.includes('3d') || titleLower.includes('３ｄ')) {
+                nowBoxClass += ' live3d';
+            } else if (live.topic_id === 'singing' || titleLower.includes('歌枠') || titleLower.includes('sing') || titleLower.includes('karaoke')) {
+                nowBoxClass += ' singing';
+            }
+            
+            displayTitle = truncate(live.title, 40);
+            nowBox.onclick = () => play(live.id, ch.info.name, live.title, isMember);
+        } else {
+            nowBoxClass += ' empty';
+        }
+
+        nowBox.className = nowBoxClass;
+        nowBox.innerHTML = prefix + displayTitle;
         
         col.appendChild(nameBox);
         col.appendChild(nowBox);
@@ -393,6 +416,18 @@ nowBox.innerHTML = (live && member ? '🔒 ' : '') + displayTitle;
 
                 const card = document.createElement('div');
                 card.className = 'stream-card';
+                
+                // --- ここから追加：配信タイプに応じてクラスを付与 ---
+                const titleLower = s.title.toLowerCase();
+                if (checkMemberOnly(s.title)) {
+                    card.classList.add('member');
+                } else if (s.topic_id === '3d_stream' || titleLower.includes('3d') || titleLower.includes('３ｄ')) {
+                    card.classList.add('live3d');
+                } else if (s.topic_id === 'singing' || titleLower.includes('歌枠') || titleLower.includes('sing') || titleLower.includes('karaoke')) {
+                    card.classList.add('singing');
+                }
+                // --- ここまで追加 ---
+
                 card.style.left = `${chX}px`;
                 card.style.top = `${topPos}px`;
                 card.style.height = `60px`;
