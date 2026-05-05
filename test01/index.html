@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Marble Ink Art Pro</title>
     <style>
+        /* 描画レイヤー（ここを白く見せることで、透明でも描きやすくする） */
+#drawingCanvas { 
+    background: white; /* 画面上は白く見えるが、保存データには反映されない */
+}
         body { margin: 0; overflow: hidden; background: #e0e0e0; font-family: sans-serif; }
         canvas { display: block; position: absolute; top: 0; left: 0; touch-action: none; }
         #ui { position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px; pointer-events: none; }
@@ -78,8 +82,7 @@
         lastPos.x = ball.x;
         lastPos.y = ball.y;
         
-        // 背景を白で塗りつぶし
-        dCtx.fillStyle = "white";
+        // dCtx.fillStyle = "white"; 透明背景のためコメントアウト
         dCtx.fillRect(0, 0, width, height);
         
         inkTime = CONFIG.INK_TIME_LIMIT;
