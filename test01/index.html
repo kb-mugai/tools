@@ -10,7 +10,17 @@
         #drawingCanvas { z-index: 1; background: transparent; }
         #mainCanvas { z-index: 2; background: transparent; }
 
-        /* UIレイヤー */
+        /* ダブルタップズーム防止 */
+        button, input, #configPanel { touch-action: manipulation; }
+
+        /* スタート画面 */
+        #startOverlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.9); z-index: 100;
+            display: flex; justify-content: center; align-items: center;
+            font-weight: bold; color: #333; font-size: 20px; cursor: pointer;
+        }
+
         #ui { position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px; pointer-events: none; z-index: 10; }
         .btns { display: flex; gap: 10px; }
         button { 
@@ -20,10 +30,8 @@
         }
         button:active { transform: scale(0.95); }
         
-        /* 設定ボタン（右上） */
         #configBtn { position: absolute; top: 20px; right: 20px; z-index: 20; padding: 10px; font-size: 24px; background: none; box-shadow: none; border-radius: 50%; }
 
-        /* 設定パネル */
         #configPanel { 
             position: absolute; top: 0; right: -280px; width: 240px; height: 100%; 
             background: rgba(255, 255, 255, 0.95); z-index: 15; padding: 80px 20px;
@@ -39,6 +47,8 @@
 </head>
 <body>
 
+<div id="startOverlay">TOUCH TO START</div>
+
 <canvas id="drawingCanvas"></canvas>
 <canvas id="mainCanvas"></canvas>
 
@@ -50,8 +60,9 @@
         <input type="range" id="rangeThickness" min="10" max="100" value="40">
     </div>
     <div class="setting-item">
-        <label>ドロドロ感（粘度）</label>
-        <input type="range" id="rangeFriction" min="20" max="99" value="96">
+        <label>インクの粘度 (右＝ドロドロ)</label>
+        <!-- この初期値がそのまま物理演算に反映されます -->
+        <input type="range" id="rangeFriction" min="0" max="100" value="20">
     </div>
     <button id="closePanel" style="width: 100%;">閉じる</button>
 </div>
@@ -73,7 +84,7 @@
         THICKNESS_SMOOTH: 0.15,
         SPEED_SENSITIVITY: 2.2,
         GRAVITY_COEFF: 0.12,
-        FRICTION: 0.96,
+        FRICTION: 0.96, // この値はスライダーから動的に上書きされます
         BOUNCE: -0.4
     };
 
@@ -86,6 +97,8 @@
     const resetBtn = document.getElementById('resetBtn');
     const configBtn = document.getElementById('configBtn');
     const configPanel = document.getElementById('configPanel');
+    const startOverlay = document.getElementById('startOverlay');
+    const rangeFriction = document.getElementById('rangeFriction');
 
     let width, height;
     let ball = { x: 0, y: 0, vx: 0, vy: 0 };
@@ -95,6 +108,12 @@
     let inkTime = CONFIG.INK_TIME_LIMIT;
     let isDrawing = false;
     let appStarted = false;
+
+    // スライダーの値から現在の摩擦係数を取得するだけの関数
+    function syncFriction() {
+        const val = parseInt(rangeFriction.value);
+        CONFIG.FRICTION = 0.98 - (val / 100) * 0.18;
+    }
 
     function init() {
         width = window.innerWidth;
@@ -107,32 +126,29 @@
         lastPos.x = ball.x;
         lastPos.y = ball.y;
         dCtx.clearRect(0, 0, width, height); 
+        
+        // 開始時にスライダーの値を読み込む
+        syncFriction();
+        CONFIG.MAX_THICKNESS = parseInt(document.getElementById('rangeThickness').value);
+        
         inkTime = CONFIG.INK_TIME_LIMIT;
         isDrawing = true;
     }
 
-    // 設定更新
+    // 設定スライダー操作
     document.getElementById('rangeThickness').addEventListener('input', (e) => {
         CONFIG.MAX_THICKNESS = parseInt(e.target.value);
     });
+    rangeFriction.addEventListener('input', syncFriction);
 
-document.getElementById('rangeFriction').addEventListener('input', (e) => {
-    const val = parseInt(e.target.value); // 0 〜 100
-    CONFIG.FRICTION = 0.98 - (val / 100) * 0.18; 
-});
+    configBtn.addEventListener('click', (e) => { e.stopPropagation(); configPanel.classList.add('open'); });
+    document.getElementById('closePanel').addEventListener('click', (e) => { e.stopPropagation(); configPanel.classList.remove('open'); });
 
-    // パネル開閉
-    configBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        configPanel.classList.add('open');
-    });
-    document.getElementById('closePanel').addEventListener('click', (e) => {
-        e.stopPropagation();
-        configPanel.classList.remove('open');
-    });
-
-    async function startApp() {
+    // 初回スタート
+    startOverlay.addEventListener('click', async () => {
         if (appStarted) return;
+        
+        // センサー許可
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             try {
                 const response = await DeviceOrientationEvent.requestPermission();
@@ -141,10 +157,12 @@ document.getElementById('rangeFriction').addEventListener('input', (e) => {
         } else {
             window.addEventListener('deviceorientation', handleOrientation);
         }
+
         appStarted = true;
+        startOverlay.style.display = 'none'; // オーバーレイを消す
         init();
         update();
-    }
+    });
 
     function handleOrientation(e) {
         accel.x = (e.gamma || 0) * CONFIG.GRAVITY_COEFF;
@@ -152,6 +170,7 @@ document.getElementById('rangeFriction').addEventListener('input', (e) => {
     }
 
     function update() {
+        if (!appStarted) return;
         if (inkTime <= 0) { isDrawing = false; inkTime = 0; }
 
         if (isDrawing) {
@@ -187,19 +206,16 @@ document.getElementById('rangeFriction').addEventListener('input', (e) => {
 
         mCtx.clearRect(0, 0, width, height);
         mCtx.drawImage(dCanvas, 0, 0);
-        
         if (isDrawing) {
             mCtx.beginPath();
             mCtx.fillStyle = "rgba(0, 0, 0, 0.4)";
             mCtx.arc(ball.x, ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2);
             mCtx.fill();
         }
-
         timerEl.innerText = `Ink: ${inkTime.toFixed(1)}s`;
         requestAnimationFrame(update);
     }
 
-    // 共有・保存
     saveBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
         dCanvas.toBlob(async (blob) => {
@@ -213,7 +229,6 @@ document.getElementById('rangeFriction').addEventListener('input', (e) => {
         }, "image/png");
     });
 
-    window.addEventListener('click', startApp, { once: true });
     resetBtn.addEventListener('click', (e) => { e.stopPropagation(); init(); });
     window.addEventListener('resize', init);
 </script>
