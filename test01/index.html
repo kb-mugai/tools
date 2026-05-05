@@ -5,44 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Marble Ink Art Pro</title>
     <style>
-        /* 1. 根本的な背景を白に固定 */
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            background-color: white; /* プレイ中の背景色 */
-            font-family: sans-serif; 
-        }
-        
-        /* 2. キャンバスの設定 */
-        canvas { 
-            display: block; 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            touch-action: none; 
-        }
+        body { margin: 0; overflow: hidden; background-color: white; font-family: sans-serif; }
+        canvas { display: block; position: absolute; top: 0; left: 0; touch-action: none; }
+        #drawingCanvas { z-index: 1; background: transparent; }
+        #mainCanvas { z-index: 2; background: transparent; }
 
-        /* 保存用（下側） */
-        #drawingCanvas { 
-            z-index: 1; 
-            background: transparent; /* ここは透明のまま */
-        }
-
-        /* 表示用（上側） */
-        #mainCanvas { 
-            z-index: 2; 
-            background: transparent; 
-        }
-        
+        /* UIレイヤー */
         #ui { position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px; pointer-events: none; z-index: 10; }
         .btns { display: flex; gap: 10px; }
         button { 
             padding: 15px 25px; font-size: 16px; border-radius: 30px; border: none; 
             background: #222; color: white; pointer-events: auto; cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.1s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: 0.1s;
         }
         button:active { transform: scale(0.95); }
-        button:disabled { background: #bbb; }
+        
+        /* 設定ボタン（右上） */
+        #configBtn { position: absolute; top: 20px; right: 20px; z-index: 20; padding: 10px; font-size: 24px; background: none; box-shadow: none; border-radius: 50%; }
+
+        /* 設定パネル */
+        #configPanel { 
+            position: absolute; top: 0; right: -280px; width: 240px; height: 100%; 
+            background: rgba(255, 255, 255, 0.95); z-index: 15; padding: 80px 20px;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1); transition: 0.3s; pointer-events: auto;
+        }
+        #configPanel.open { right: 0; }
+        .setting-item { margin-bottom: 30px; }
+        .setting-item label { display: block; font-size: 14px; margin-bottom: 10px; font-weight: bold; }
+        input[type=range] { width: 100%; }
+
         #timer { font-size: 20px; font-weight: bold; color: #222; background: rgba(255,255,255,0.7); padding: 5px 15px; border-radius: 15px; }
     </style>
 </head>
@@ -51,10 +42,24 @@
 <canvas id="drawingCanvas"></canvas>
 <canvas id="mainCanvas"></canvas>
 
+<button id="configBtn">⚙️</button>
+
+<div id="configPanel">
+    <div class="setting-item">
+        <label>インクの最大太さ</label>
+        <input type="range" id="rangeThickness" min="10" max="100" value="40">
+    </div>
+    <div class="setting-item">
+        <label>ドロドロ感（粘度）</label>
+        <input type="range" id="rangeFriction" min="80" max="99" value="96">
+    </div>
+    <button id="closePanel" style="width: 100%;">閉じる</button>
+</div>
+
 <div id="ui">
     <div id="timer">Ink: 20.0s</div>
     <div class="btns">
-        <button id="saveBtn">透過PNGを保存</button>
+        <button id="saveBtn">透過保存/共有</button>
         <button id="resetBtn" style="background: #555;">リセット</button>
     </div>
 </div>
@@ -79,6 +84,8 @@
     const timerEl = document.getElementById('timer');
     const saveBtn = document.getElementById('saveBtn');
     const resetBtn = document.getElementById('resetBtn');
+    const configBtn = document.getElementById('configBtn');
+    const configPanel = document.getElementById('configPanel');
 
     let width, height;
     let ball = { x: 0, y: 0, vx: 0, vy: 0 };
@@ -94,31 +101,40 @@
         height = window.innerHeight;
         dCanvas.width = mCanvas.width = width;
         dCanvas.height = mCanvas.height = height;
-        
         ball.x = width / 2;
         ball.y = height / 2;
-        ball.vx = 0;
-        ball.vy = 0;
+        ball.vx = ball.vy = 0;
         lastPos.x = ball.x;
         lastPos.y = ball.y;
-        
-        // 保存用キャンバスを完全に透明にする
         dCtx.clearRect(0, 0, width, height); 
-        
         inkTime = CONFIG.INK_TIME_LIMIT;
-        currentInkThickness = CONFIG.MAX_THICKNESS;
         isDrawing = true;
-        saveBtn.disabled = false;
     }
+
+    // 設定更新
+    document.getElementById('rangeThickness').addEventListener('input', (e) => {
+        CONFIG.MAX_THICKNESS = parseInt(e.target.value);
+    });
+    document.getElementById('rangeFriction').addEventListener('input', (e) => {
+        CONFIG.FRICTION = parseInt(e.target.value) / 100;
+    });
+
+    // パネル開閉
+    configBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        configPanel.classList.add('open');
+    });
+    document.getElementById('closePanel').addEventListener('click', (e) => {
+        e.stopPropagation();
+        configPanel.classList.remove('open');
+    });
 
     async function startApp() {
         if (appStarted) return;
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             try {
                 const response = await DeviceOrientationEvent.requestPermission();
-                if (response === 'granted') {
-                    window.addEventListener('deviceorientation', handleOrientation);
-                }
+                if (response === 'granted') window.addEventListener('deviceorientation', handleOrientation);
             } catch (e) { console.error(e); }
         } else {
             window.addEventListener('deviceorientation', handleOrientation);
@@ -134,10 +150,7 @@
     }
 
     function update() {
-        if (inkTime <= 0) {
-            isDrawing = false;
-            inkTime = 0;
-        }
+        if (inkTime <= 0) { isDrawing = false; inkTime = 0; }
 
         if (isDrawing) {
             ball.vx += accel.x;
@@ -171,17 +184,12 @@
         }
 
         mCtx.clearRect(0, 0, width, height);
-        // 背景が透けて見えるように上書き
         mCtx.drawImage(dCanvas, 0, 0);
         
         if (isDrawing) {
             mCtx.beginPath();
-            mCtx.fillStyle = "rgba(0, 0, 0, 0.4)"; // ビー玉本体（半透明の黒）
+            mCtx.fillStyle = "rgba(0, 0, 0, 0.4)";
             mCtx.arc(ball.x, ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2);
-            mCtx.fill();
-            mCtx.beginPath();
-            mCtx.fillStyle = "rgba(255, 255, 255, 0.3)"; // 光沢
-            mCtx.arc(ball.x - CONFIG.BALL_RADIUS*0.3, ball.y - CONFIG.BALL_RADIUS*0.3, CONFIG.BALL_RADIUS*0.2, 0, Math.PI * 2);
             mCtx.fill();
         }
 
@@ -189,42 +197,22 @@
         requestAnimationFrame(update);
     }
 
-    window.addEventListener('click', startApp, { once: true });
-    
-saveBtn.addEventListener('click', async (e) => {
-    e.stopPropagation();
-
-    // 1. Canvasから画像データ（Blob）を作成
-    dCanvas.toBlob(async (blob) => {
-        const file = new File([blob], `marble-art-${Date.now()}.png`, { type: "image/png" });
-
-        // 2. Web Share APIが使えるか確認
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            try {
-                // 3. 共有シートを起動
-                await navigator.share({
-                    files: [file],
-                    title: 'Marble Art',
-                    text: 'ビー玉アートで作った作品です'
-                });
-            } catch (err) {
-                console.error("Share failed", err);
-            }
-        } else {
-            // Web Share API非対応（PCなど）の場合は従来のダウンロード
-            const link = document.createElement('a');
-            link.download = file.name;
-            link.href = URL.createObjectURL(blob);
-            link.click();
-        }
-    }, "image/png");
-});
-
-    resetBtn.addEventListener('click', (e) => {
+    // 共有・保存
+    saveBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        init();
+        dCanvas.toBlob(async (blob) => {
+            const file = new File([blob], `marble-art-${Date.now()}.png`, { type: "image/png" });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try { await navigator.share({ files: [file], title: 'Marble Art' }); } catch (err) {}
+            } else {
+                const link = document.createElement('a');
+                link.download = file.name; link.href = URL.createObjectURL(blob); link.click();
+            }
+        }, "image/png");
     });
 
+    window.addEventListener('click', startApp, { once: true });
+    resetBtn.addEventListener('click', (e) => { e.stopPropagation(); init(); });
     window.addEventListener('resize', init);
 </script>
 </body>
