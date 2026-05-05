@@ -2,182 +2,156 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Acoustic Modem V14 - Dual-Tone Advanced</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Marble Ink Art</title>
     <style>
-        body { font-family: 'Consolas', monospace; background: #050505; color: #00ff41; padding: 20px; }
-        .card { border: 1px solid #00ff41; padding: 15px; background: rgba(0,255,65,0.05); margin-bottom: 15px; box-shadow: 0 0 15px rgba(0,255,0,0.3); }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .param-group { border: 1px inset #444; padding: 10px; margin-top: 5px; }
-        label { font-size: 11px; color: #888; display: block; }
-        input, select { background: #000; color: #0f0; border: 1px solid #0f0; width: 90%; padding: 5px; margin-bottom: 5px; }
-        button { background: #00ff41; color: #000; border: none; padding: 15px; cursor: pointer; width: 100%; font-weight: bold; font-size: 1.1em; }
-        #rxResult { font-size: 2.2em; color: #fff; min-height: 1.5em; border: 1px solid #0f0; padding: 15px; margin-top: 10px; background: #111; word-break: break-all; }
-        canvas { width: 100%; height: 80px; background: #000; border: 1px solid #333; }
+        body { margin: 0; overflow: hidden; background: #f0f0f0; font-family: sans-serif; }
+        canvas { display: block; position: absolute; top: 0; left: 0; touch-action: none; }
+        #ui { position: absolute; bottom: 20px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none; }
+        button { 
+            padding: 12px 24px; font-size: 16px; border-radius: 25px; border: none; 
+            background: #333; color: white; pointer-events: auto; cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        button:disabled { background: #999; }
+        #timer { font-size: 24px; font-weight: bold; color: #333; text-shadow: 1px 1px 2px white; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h3>Dual-Tone Sound Engine</h3>
-    <div class="grid">
-        <div class="param-group">
-            <strong>LOW GROUP (2-bit)</strong>
-            <label>Waveform (OSC 1)</label>
-            <select id="wave1">
-                <option value="sine">Sine (Stable)</option>
-                <option value="triangle" selected>Triangle (Soft)</option>
-                <option value="square">Square (Retro)</option>
-                <option value="sawtooth">Sawtooth (Aggressive)</option>
-            </select>
-            <label>Start Frequency (Hz)</label>
-            <input type="number" id="fLowStart" value="1000">
-            <label>Step Gap (Hz)</label>
-            <input type="number" id="fLowStep" value="400">
-        </div>
-        <div class="param-group">
-            <strong>HIGH GROUP (2-bit)</strong>
-            <label>Waveform (OSC 2)</label>
-            <select id="wave2">
-                <option value="sine" selected>Sine (Stable)</option>
-                <option value="triangle">Triangle (Soft)</option>
-                <option value="square">Square (Retro)</option>
-                <option value="sawtooth">Sawtooth (Aggressive)</option>
-            </select>
-            <label>Start Frequency (Hz)</label>
-            <input type="number" id="fHighStart" value="4000">
-            <label>Step Gap (Hz)</label>
-            <input type="number" id="fHighStep" value="600">
-        </div>
-    </div>
-    <div class="grid" style="margin-top:10px;">
-        <div>Base(fB): <input type="number" id="fB" value="500">Hz</div>
-        <div>DataMs: <input type="number" id="dMs" value="100">ms</div>
-        <div>BaseMs: <input type="number" id="bMs" value="20">ms</div>
-    </div>
-</div>
+<!-- 描画レイヤー（保存対象） -->
+<canvas id="drawingCanvas"></canvas>
+<!-- 表示用レイヤー（ボール描画用） -->
+<canvas id="mainCanvas"></canvas>
 
-<div class="card">
-    <input type="text" id="txMsg" value="OK GO" style="width:75%; font-size:1.5em; padding:10px;">
-    <button onclick="send()">TRANSMIT ⚡</button>
-</div>
-
-<div class="card">
-    <button onclick="toggleRx()">ACTIVATE RECEIVER</button>
-    <canvas id="visualizer"></canvas>
-    <div id="status">STATUS: OFFLINE</div>
-    <div id="rxResult"></div>
+<div id="ui">
+    <div id="timer">Ink: 10.0s</div>
+    <button id="saveBtn">作品を保存する</button>
+    <button id="resetBtn" style="background: #666;">もう一度描く</button>
 </div>
 
 <script>
-let audioCtx, isRx = false, animationId;
+    const dCanvas = document.getElementById('drawingCanvas');
+    const mCanvas = document.getElementById('mainCanvas');
+    const dCtx = dCanvas.getContext('2d');
+    const mCtx = mCanvas.getContext('2d');
+    const timerEl = document.getElementById('timer');
+    const saveBtn = document.getElementById('saveBtn');
+    const resetBtn = document.getElementById('resetBtn');
 
-function getParams() {
-    const lStart = +document.getElementById('fLowStart').value;
-    const lStep = +document.getElementById('fLowStep').value;
-    const hStart = +document.getElementById('fHighStart').value;
-    const hStep = +document.getElementById('fHighStep').value;
+    let width, height;
+    let ball = { x: 0, y: 0, vx: 0, vy: 0, radius: 12 };
+    let accel = { x: 0, y: 0 };
+    let inkTime = 10.0;
+    let isDrawing = true;
 
-    return {
-        fB: +document.getElementById('fB').value,
-        lowGroup: [0,1,2,3].map(i => lStart + (i * lStep)),
-        highGroup: [0,1,2,3].map(i => hStart + (i * hStep)),
-        wave1: document.getElementById('wave1').value,
-        wave2: document.getElementById('wave2').value,
-        dMs: +document.getElementById('dMs').value / 1000,
-        bMs: +document.getElementById('bMs').value / 1000,
-        thresh: 70
-    };
-}
-
-async function send() {
-    if (!audioCtx) audioCtx = new AudioContext();
-    const p = getParams();
-    const msg = document.getElementById('txMsg').value;
-    
-    const osc1 = audioCtx.createOscillator();
-    const osc2 = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    
-    osc1.type = p.wave1;
-    osc2.type = p.wave2;
-    osc1.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
-    gain.gain.value = 0.4;
-
-    let now = audioCtx.currentTime;
-    osc1.start(now); osc2.start(now);
-    
-    // Sync Start
-    osc1.frequency.setValueAtTime(p.fB, now);
-    osc2.frequency.setValueAtTime(0, now);
-    now += p.dMs * 3;
-
-    for (let i = 0; i < msg.length; i++) {
-        const code = msg.charCodeAt(i);
-        const nibbles = [(code >> 4) & 0x0F, code & 0x0F];
+    // 初期化
+    function init() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        dCanvas.width = mCanvas.width = width;
+        dCanvas.height = mCanvas.height = height;
         
-        for (let val of nibbles) {
-            const lIdx = (val >> 2) & 0x03;
-            const hIdx = val & 0x03;
-            osc1.frequency.setValueAtTime(p.lowGroup[lIdx], now);
-            osc2.frequency.setValueAtTime(p.highGroup[hIdx], now);
-            now += p.dMs;
-            
-            // Base音 (最短20msの設定が可能)
-            osc1.frequency.setValueAtTime(p.fB, now);
-            osc2.frequency.setValueAtTime(0, now);
-            now += p.bMs;
-        }
+        ball.x = width / 2;
+        ball.y = height / 2;
+        ball.vx = 0;
+        ball.vy = 0;
+        
+        dCtx.fillStyle = "white";
+        dCtx.fillRect(0, 0, width, height);
+        inkTime = 10.0;
+        isDrawing = true;
+        saveBtn.disabled = false;
     }
-    osc1.stop(now + 0.1); osc2.stop(now + 0.1);
-}
 
-async function toggleRx() {
-    if (isRx) { isRx = false; cancelAnimationFrame(animationId); return; }
-    isRx = true;
-    document.getElementById('rxResult').innerText = "";
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false } });
-    audioCtx = new AudioContext();
-    const source = audioCtx.createMediaStreamSource(stream);
-    const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
-    source.connect(analyser);
-
-    const freqData = new Uint8Array(analyser.frequencyBinCount);
-    const p = getParams();
-    let isDecoding = false, nibs = [], lastState = "base";
-
-    function loop() {
-        if (!isRx) return;
-        analyser.getByteFrequencyData(freqData);
-        const binSize = audioCtx.sampleRate / analyser.fftSize;
-        const getAmp = (f) => freqData[Math.round(f / binSize)];
-        
-        const aB = getAmp(p.fB);
-        const lAmps = p.lowGroup.map(f => getAmp(f));
-        const hAmps = p.highGroup.map(f => getAmp(f));
-        const maxL = Math.max(...lAmps), maxH = Math.max(...hAmps);
-
-        if (!isDecoding && aB > p.thresh) {
-            isDecoding = true;
-            document.getElementById('status').innerText = "STATUS: ONLINE";
-        }
-
-        if (isDecoding) {
-            if (lastState === "base" && maxL > p.thresh && maxH > p.thresh) {
-                nibs.push((lAmps.indexOf(maxL) << 2) | hAmps.indexOf(maxH));
-                lastState = "data";
-                if (nibs.length === 2) {
-                    document.getElementById('rxResult').innerText += String.fromCharCode((nibs[0] << 4) | nibs[1]);
-                    nibs = [];
+    // 加速度センサー（ジャイロ）の取得
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ のための権限リクエスト
+        mCanvas.addEventListener('click', () => {
+            DeviceOrientationEvent.requestPermission().then(response => {
+                if (response === 'granted') {
+                    window.addEventListener('deviceorientation', handleOrientation);
                 }
-            } else if (lastState === "data" && aB > p.thresh && maxL < p.thresh) {
-                lastState = "base";
-            }
-        }
-        animationId = requestAnimationFrame(loop);
+            });
+        }, { once: true });
+    } else {
+        window.addEventListener('deviceorientation', handleOrientation);
     }
-    loop();
-}
+
+    function handleOrientation(e) {
+        // 傾きに応じて加速度を設定
+        accel.x = e.gamma * 0.1;
+        accel.y = e.beta * 0.1;
+    }
+
+    function update() {
+        if (inkTime <= 0) {
+            isDrawing = false;
+            inkTime = 0;
+        }
+
+        if (isDrawing) {
+            // 物理演算
+            ball.vx += accel.x;
+            ball.vy += accel.y;
+            ball.vx *= 0.98; // 摩擦
+            ball.vy *= 0.98;
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // 壁判定
+            if (ball.x < ball.radius) { ball.x = ball.radius; ball.vx *= -0.5; }
+            if (ball.x > width - ball.radius) { ball.x = width - ball.radius; ball.vx *= -0.5; }
+            if (ball.y < ball.radius) { ball.y = ball.radius; ball.vy *= -0.5; }
+            if (ball.y > height - ball.radius) { ball.y = height - ball.radius; ball.vy *= -0.5; }
+
+            // 描画（軌跡）
+            const speed = Math.sqrt(ball.vx ** 2 + ball.vy ** 2);
+            // スピードが遅いほど太く（20px〜5pxの範囲で可変）
+            const inkSize = Math.max(5, 30 - speed * 2.5);
+            
+            dCtx.beginPath();
+            dCtx.fillStyle = "black";
+            dCtx.arc(ball.x, ball.y, inkSize / 2, 0, Math.PI * 2);
+            dCtx.fill();
+
+            inkTime -= 1/60;
+        }
+
+        // メインキャンバスの描画
+        mCtx.clearRect(0, 0, width, height);
+        mCtx.drawImage(dCanvas, 0, 0); // 軌跡をコピー
+        
+        // ボールの表示（描画中のみ）
+        if (isDrawing) {
+            mCtx.beginPath();
+            mCtx.fillStyle = "#555";
+            mCtx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            mCtx.fill();
+            // ボールのハイライト
+            mCtx.beginPath();
+            mCtx.fillStyle = "rgba(255,255,255,0.3)";
+            mCtx.arc(ball.x - 4, ball.y - 4, 3, 0, Math.PI * 2);
+            mCtx.fill();
+        }
+
+        timerEl.innerText = `Ink: ${inkTime.toFixed(1)}s`;
+        requestAnimationFrame(update);
+    }
+
+    // 画像保存
+    saveBtn.addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.download = `marble-art-${Date.now()}.png`;
+        link.href = dCanvas.toDataURL();
+        link.click();
+    });
+
+    resetBtn.addEventListener('click', init);
+
+    window.addEventListener('resize', init);
+    init();
+    update();
 </script>
 </body>
 </html>
