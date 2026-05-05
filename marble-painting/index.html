@@ -1,9 +1,13 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ビー玉アート Pro</title>
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Marble Painting|ビー玉アート</title>
+<meta name="description" content="ビー玉アート。登録不要・無料で使えます。">
     <style>
         body { margin: 0; overflow: hidden; background-color: white; font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif; }
         canvas { display: block; position: absolute; top: 0; left: 0; touch-action: none; }
@@ -58,7 +62,7 @@
 <body>
 
 <div id="startOverlay">
-    <div class="start-title">ビー玉アート Pro</div>
+    <div class="start-title">ビー玉アート ver1.0.0</div>
     <div class="start-guide">画面をタッチしてスタート</div>
 </div>
 
@@ -68,9 +72,7 @@
 <button id="configBtn">⚙️</button>
 
 <div id="configPanel">
-    <div class="panel-title">ビー玉アート Pro</div>
-    <span class="panel-ver">v1.0.0</span>
-
+    <div class="panel-title">【設定】</div>
     <div class="setting-item">
         <label>インクの最大太さ</label>
         <input type="range" id="rangeThickness" min="10" max="100" value="40">
@@ -92,16 +94,18 @@
     <div class="note">
         【使い方】<br>
         ・端末を傾けてビー玉を転がします。<br>
-        ・インクが切れるまで描画できます。<br>
-        ・「透過」は線画素材として利用可能です。<br>
-        ・保存時は共有シートが開きます。
+        ・インクが切れるまで描画できますが、途中で保存もできます。<br>
+        ・背景「透過」は線画利用して他イラストソフト等で色塗りする場合に便利です。<br>
+        　※透過保存はスマホ上は真っ黒で表示されますが問題ありません
     </div>
+            <br>
+            <a href="../" style="color: #00b7ff; text-decoration: underline; font-size: 0.6rem;">トップページへ戻る</a>
 </div>
 
 <div id="ui">
     <div id="timer">Ink: 20.0s</div>
     <div class="btns">
-        <button id="saveBtn">保存 / 共有</button>
+        <button id="saveBtn">保存</button>
         <button id="resetBtn" style="background: #555;">リセット</button>
     </div>
 </div>
@@ -255,7 +259,7 @@
         targetCanvas.toBlob(async (blob) => {
             const file = new File([blob], `marble-art-${Date.now()}.png`, { type: "image/png" });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try { await navigator.share({ files: [file], title: 'ビー玉アート Pro' }); } catch (err) {}
+                try { await navigator.share({ files: [file], title: 'ビー玉アート' }); } catch (err) {}
             } else {
                 const link = document.createElement('a');
                 link.download = file.name; link.href = URL.createObjectURL(blob); link.click();
@@ -266,5 +270,6 @@
     resetBtn.addEventListener('click', (e) => { e.stopPropagation(); init(); });
     window.addEventListener('resize', init);
 </script>
+<script data-goatcounter="https://kb-mugai.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
