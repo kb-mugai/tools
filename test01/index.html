@@ -3,34 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Marble Ink Art</title>
+    <title>Marble Ink Art Pro</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #f0f0f0; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; background: #e0e0e0; font-family: sans-serif; }
         canvas { display: block; position: absolute; top: 0; left: 0; touch-action: none; }
-        #ui { position: absolute; bottom: 20px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none; }
+        #ui { position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px; pointer-events: none; }
+        .btns { display: flex; gap: 10px; }
         button { 
-            padding: 12px 24px; font-size: 16px; border-radius: 25px; border: none; 
-            background: #333; color: white; pointer-events: auto; cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            padding: 15px 25px; font-size: 16px; border-radius: 30px; border: none; 
+            background: #222; color: white; pointer-events: auto; cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.1s;
         }
-        button:disabled { background: #999; }
-        #timer { font-size: 24px; font-weight: bold; color: #333; text-shadow: 1px 1px 2px white; }
+        button:active { transform: scale(0.95); }
+        button:disabled { background: #bbb; }
+        #timer { font-size: 20px; font-weight: bold; color: #222; background: rgba(255,255,255,0.7); padding: 5px 15px; border-radius: 15px; }
     </style>
 </head>
 <body>
 
-<!-- 描画レイヤー（保存対象） -->
 <canvas id="drawingCanvas"></canvas>
-<!-- 表示用レイヤー（ボール描画用） -->
 <canvas id="mainCanvas"></canvas>
 
 <div id="ui">
     <div id="timer">Ink: 10.0s</div>
-    <button id="saveBtn">作品を保存する</button>
-    <button id="resetBtn" style="background: #666;">もう一度描く</button>
+    <div class="btns">
+        <button id="saveBtn">作品を保存</button>
+        <button id="resetBtn" style="background: #555;">リセット</button>
+    </div>
 </div>
 
 <script>
+    /** 
+     * --- 調整用パラメータ設定 ---
+     */
+    const CONFIG = {
+        INK_TIME_LIMIT: 20.0,    // 描画制限時間（秒）
+        BALL_RADIUS: 40,         // ビー玉の見た目の大きさ
+        MIN_THICKNESS: 6,        // インクの最小太さ（速く動かした時）
+        MAX_THICKNESS: 40,       // インクの最大太さ（止まっている時）
+        THICKNESS_SMOOTH: 0.15,  // 太さの変化の滑らかさ（0〜1 / 小さいほどじわじわ変わる）
+        SPEED_SENSITIVITY: 2.2,  // 速度による太さの変化率（大きいほどすぐ細くなる）
+        GRAVITY_COEFF: 0.12,     // 傾きに対する加速の強さ
+        FRICTION: 0.96,          // 摩擦（1に近いほど止まりにくい）
+        BOUNCE: -0.4             // 壁に当たった時の跳ね返り強度
+    };
+
     const dCanvas = document.getElementById('drawingCanvas');
     const mCanvas = document.getElementById('mainCanvas');
     const dCtx = dCanvas.getContext('2d');
@@ -40,12 +57,14 @@
     const resetBtn = document.getElementById('resetBtn');
 
     let width, height;
-    let ball = { x: 0, y: 0, vx: 0, vy: 0, radius: 12 };
+    let ball = { x: 0, y: 0, vx: 0, vy: 0 };
+    let lastPos = { x: 0, y: 0 }; // 前回の座標保存用
     let accel = { x: 0, y: 0 };
-    let inkTime = 10.0;
-    let isDrawing = true;
+    let currentInkThickness = CONFIG.MAX_THICKNESS;
+    let inkTime = CONFIG.INK_TIME_LIMIT;
+    let isDrawing = false;
+    let appStarted = false;
 
-    // 初期化
     function init() {
         width = window.innerWidth;
         height = window.innerHeight;
@@ -56,32 +75,42 @@
         ball.y = height / 2;
         ball.vx = 0;
         ball.vy = 0;
+        lastPos.x = ball.x;
+        lastPos.y = ball.y;
         
+        // 背景を白で塗りつぶし
         dCtx.fillStyle = "white";
         dCtx.fillRect(0, 0, width, height);
-        inkTime = 10.0;
+        
+        inkTime = CONFIG.INK_TIME_LIMIT;
+        currentInkThickness = CONFIG.MAX_THICKNESS;
         isDrawing = true;
         saveBtn.disabled = false;
     }
 
-    // 加速度センサー（ジャイロ）の取得
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS 13+ のための権限リクエスト
-        mCanvas.addEventListener('click', () => {
-            DeviceOrientationEvent.requestPermission().then(response => {
+    // センサー許可と開始
+    async function startApp() {
+        if (appStarted) return;
+        
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            try {
+                const response = await DeviceOrientationEvent.requestPermission();
                 if (response === 'granted') {
                     window.addEventListener('deviceorientation', handleOrientation);
                 }
-            });
-        }, { once: true });
-    } else {
-        window.addEventListener('deviceorientation', handleOrientation);
+            } catch (e) { console.error(e); }
+        } else {
+            window.addEventListener('deviceorientation', handleOrientation);
+        }
+        
+        appStarted = true;
+        init();
+        update();
     }
 
     function handleOrientation(e) {
-        // 傾きに応じて加速度を設定
-        accel.x = e.gamma * 0.1;
-        accel.y = e.beta * 0.1;
+        accel.x = (e.gamma || 0) * CONFIG.GRAVITY_COEFF;
+        accel.y = (e.beta || 0) * CONFIG.GRAVITY_COEFF;
     }
 
     function update() {
@@ -94,44 +123,53 @@
             // 物理演算
             ball.vx += accel.x;
             ball.vy += accel.y;
-            ball.vx *= 0.98; // 摩擦
-            ball.vy *= 0.98;
+            ball.vx *= CONFIG.FRICTION;
+            ball.vy *= CONFIG.FRICTION;
             ball.x += ball.vx;
             ball.y += ball.vy;
 
             // 壁判定
-            if (ball.x < ball.radius) { ball.x = ball.radius; ball.vx *= -0.5; }
-            if (ball.x > width - ball.radius) { ball.x = width - ball.radius; ball.vx *= -0.5; }
-            if (ball.y < ball.radius) { ball.y = ball.radius; ball.vy *= -0.5; }
-            if (ball.y > height - ball.radius) { ball.y = height - ball.radius; ball.vy *= -0.5; }
+            if (ball.x < CONFIG.BALL_RADIUS) { ball.x = CONFIG.BALL_RADIUS; ball.vx *= CONFIG.BOUNCE; }
+            if (ball.x > width - CONFIG.BALL_RADIUS) { ball.x = width - CONFIG.BALL_RADIUS; ball.vx *= CONFIG.BOUNCE; }
+            if (ball.y < CONFIG.BALL_RADIUS) { ball.y = CONFIG.BALL_RADIUS; ball.vy *= CONFIG.BOUNCE; }
+            if (ball.y > height - CONFIG.BALL_RADIUS) { ball.y = height - CONFIG.BALL_RADIUS; ball.vy *= CONFIG.BOUNCE; }
 
-            // 描画（軌跡）
+            // 速度に基づいた太さ計算
             const speed = Math.sqrt(ball.vx ** 2 + ball.vy ** 2);
-            // スピードが遅いほど太く（20px〜5pxの範囲で可変）
-            const inkSize = Math.max(5, 30 - speed * 2.5);
+            const targetThickness = Math.max(CONFIG.MIN_THICKNESS, CONFIG.MAX_THICKNESS - speed * CONFIG.SPEED_SENSITIVITY);
             
-            dCtx.beginPath();
-            dCtx.fillStyle = "black";
-            dCtx.arc(ball.x, ball.y, inkSize / 2, 0, Math.PI * 2);
-            dCtx.fill();
+            // 太さを滑らかに変化（線がカクつくのを防ぐ）
+            currentInkThickness += (targetThickness - currentInkThickness) * CONFIG.THICKNESS_SMOOTH;
 
+            // 描画（線で繋ぐ）
+            dCtx.beginPath();
+            dCtx.strokeStyle = "black";
+            dCtx.lineWidth = currentInkThickness;
+            dCtx.lineCap = "round";
+            dCtx.lineJoin = "round";
+            dCtx.moveTo(lastPos.x, lastPos.y);
+            dCtx.lineTo(ball.x, ball.y);
+            dCtx.stroke();
+
+            lastPos.x = ball.x;
+            lastPos.y = ball.y;
             inkTime -= 1/60;
         }
 
-        // メインキャンバスの描画
+        // 表示用更新
         mCtx.clearRect(0, 0, width, height);
-        mCtx.drawImage(dCanvas, 0, 0); // 軌跡をコピー
+        mCtx.drawImage(dCanvas, 0, 0);
         
-        // ボールの表示（描画中のみ）
         if (isDrawing) {
+            // ビー玉の見た目
             mCtx.beginPath();
-            mCtx.fillStyle = "#555";
-            mCtx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            mCtx.fillStyle = "rgba(100, 100, 100, 0.8)";
+            mCtx.arc(ball.x, ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2);
             mCtx.fill();
-            // ボールのハイライト
+            // 光沢
             mCtx.beginPath();
-            mCtx.fillStyle = "rgba(255,255,255,0.3)";
-            mCtx.arc(ball.x - 4, ball.y - 4, 3, 0, Math.PI * 2);
+            mCtx.fillStyle = "rgba(255, 255, 255, 0.4)";
+            mCtx.arc(ball.x - CONFIG.BALL_RADIUS*0.3, ball.y - CONFIG.BALL_RADIUS*0.3, CONFIG.BALL_RADIUS*0.2, 0, Math.PI * 2);
             mCtx.fill();
         }
 
@@ -139,19 +177,23 @@
         requestAnimationFrame(update);
     }
 
-    // 画像保存
-    saveBtn.addEventListener('click', () => {
+    // イベント
+    window.addEventListener('click', startApp, { once: true });
+    
+    saveBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // 重複起動防止
         const link = document.createElement('a');
         link.download = `marble-art-${Date.now()}.png`;
-        link.href = dCanvas.toDataURL();
+        link.href = dCanvas.toDataURL("image/png");
         link.click();
     });
 
-    resetBtn.addEventListener('click', init);
+    resetBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        init();
+    });
 
     window.addEventListener('resize', init);
-    init();
-    update();
 </script>
 </body>
 </html>
