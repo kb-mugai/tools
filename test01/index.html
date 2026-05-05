@@ -3,24 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Marble Ink Art Pro</title>
+    <title>ビー玉アート Pro</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: white; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: white; font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif; }
         canvas { display: block; position: absolute; top: 0; left: 0; touch-action: none; }
         #drawingCanvas { z-index: 1; background: transparent; }
         #mainCanvas { z-index: 2; background: transparent; }
 
-        /* ダブルタップズーム防止 */
-        button, input, #configPanel { touch-action: manipulation; }
+        /* 操作ミス防止 */
+        button, input, select, #configPanel { touch-action: manipulation; }
 
         /* スタート画面 */
         #startOverlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(255,255,255,0.9); z-index: 100;
-            display: flex; justify-content: center; align-items: center;
-            font-weight: bold; color: #333; font-size: 20px; cursor: pointer;
+            background: rgba(255,255,255,0.95); z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            cursor: pointer; text-align: center;
         }
+        .start-title { font-size: 28px; font-weight: bold; margin-bottom: 10px; color: #222; }
+        .start-guide { font-size: 14px; color: #666; }
 
+        /* UI（下部ボタン） */
         #ui { position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px; pointer-events: none; z-index: 10; }
         .btns { display: flex; gap: 10px; }
         button { 
@@ -30,24 +33,34 @@
         }
         button:active { transform: scale(0.95); }
         
+        /* 設定パネル */
         #configBtn { position: absolute; top: 20px; right: 20px; z-index: 20; padding: 10px; font-size: 24px; background: none; box-shadow: none; border-radius: 50%; }
-
         #configPanel { 
-            position: absolute; top: 0; right: -280px; width: 240px; height: 100%; 
-            background: rgba(255, 255, 255, 0.95); z-index: 15; padding: 80px 20px;
+            position: absolute; top: 0; right: -300px; width: 260px; height: 100%; 
+            background: rgba(255, 255, 255, 0.98); z-index: 15; padding: 60px 20px;
             box-shadow: -2px 0 10px rgba(0,0,0,0.1); transition: 0.3s; pointer-events: auto;
+            overflow-y: auto;
         }
         #configPanel.open { right: 0; }
-        .setting-item { margin-bottom: 30px; }
-        .setting-item label { display: block; font-size: 14px; margin-bottom: 10px; font-weight: bold; }
-        input[type=range] { width: 100%; }
 
-        #timer { font-size: 20px; font-weight: bold; color: #222; background: rgba(255,255,255,0.7); padding: 5px 15px; border-radius: 15px; }
+        .panel-title { font-size: 20px; font-weight: bold; margin-bottom: 5px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .panel-ver { font-size: 10px; color: #aaa; margin-bottom: 25px; display: block; }
+        
+        .setting-item { margin-bottom: 25px; }
+        .setting-item label { display: block; font-size: 13px; margin-bottom: 8px; font-weight: bold; color: #444; }
+        input[type=range], select { width: 100%; box-sizing: border-box; }
+        
+        .note { font-size: 11px; color: #888; line-height: 1.6; margin-top: 30px; padding: 15px; background: #f9f9f9; border-radius: 10px; }
+
+        #timer { font-size: 18px; font-weight: bold; color: #222; background: rgba(255,255,255,0.7); padding: 5px 15px; border-radius: 15px; border: 1px solid rgba(0,0,0,0.1); }
     </style>
 </head>
 <body>
 
-<div id="startOverlay">TOUCH TO START</div>
+<div id="startOverlay">
+    <div class="start-title">ビー玉アート Pro</div>
+    <div class="start-guide">画面をタッチしてスタート</div>
+</div>
 
 <canvas id="drawingCanvas"></canvas>
 <canvas id="mainCanvas"></canvas>
@@ -55,31 +68,40 @@
 <button id="configBtn">⚙️</button>
 
 <div id="configPanel">
+    <div class="panel-title">ビー玉アート Pro</div>
+    <span class="panel-ver">v1.0.0</span>
+
     <div class="setting-item">
         <label>インクの最大太さ</label>
         <input type="range" id="rangeThickness" min="10" max="100" value="40">
     </div>
     <div class="setting-item">
-        <label>インクの粘度 (右＝ドロドロ)</label>
-        <!-- この初期値がそのまま物理演算に反映されます -->
+        <label>インクの粘度 (右＝重め)</label>
         <input type="range" id="rangeFriction" min="0" max="100" value="20">
     </div>
-
-<div class="setting-item">
-        <label>保存時の背景色</label>
-        <select id="bgSelect" style="width: 100%; padding: 5px; pointer-events: auto;">
-            <option value="transparent">透明 (線画のみ保存)</option>
-            <option value="white">白色</option>
+    <div class="setting-item">
+        <label>保存時の背景</label>
+        <select id="bgSelect">
+            <option value="transparent">透明 (線画用)</option>
+            <option value="white">白色 (SNS共有用)</option>
         </select>
     </div>
 
-    <button id="closePanel" style="width: 100%;">閉じる</button>
+    <button id="closePanel" style="width: 100%; margin-top: 10px;">閉じる</button>
+
+    <div class="note">
+        【使い方】<br>
+        ・端末を傾けてビー玉を転がします。<br>
+        ・インクが切れるまで描画できます。<br>
+        ・「透過」は線画素材として利用可能です。<br>
+        ・保存時は共有シートが開きます。
+    </div>
 </div>
 
 <div id="ui">
     <div id="timer">Ink: 20.0s</div>
     <div class="btns">
-        <button id="saveBtn">保存</button>
+        <button id="saveBtn">保存 / 共有</button>
         <button id="resetBtn" style="background: #555;">リセット</button>
     </div>
 </div>
@@ -93,7 +115,7 @@
         THICKNESS_SMOOTH: 0.15,
         SPEED_SENSITIVITY: 2.2,
         GRAVITY_COEFF: 0.12,
-        FRICTION: 0.96, // この値はスライダーから動的に上書きされます
+        FRICTION: 0.96,
         BOUNCE: -0.4
     };
 
@@ -108,6 +130,8 @@
     const configPanel = document.getElementById('configPanel');
     const startOverlay = document.getElementById('startOverlay');
     const rangeFriction = document.getElementById('rangeFriction');
+    const rangeThickness = document.getElementById('rangeThickness');
+    const bgSelect = document.getElementById('bgSelect');
 
     let width, height;
     let ball = { x: 0, y: 0, vx: 0, vy: 0 };
@@ -118,10 +142,10 @@
     let isDrawing = false;
     let appStarted = false;
 
-    // スライダーの値から現在の摩擦係数を取得するだけの関数
-    function syncFriction() {
-        const val = parseInt(rangeFriction.value);
-        CONFIG.FRICTION = 0.98 - (val / 100) * 0.18;
+    function syncSettings() {
+        const fVal = parseInt(rangeFriction.value);
+        CONFIG.FRICTION = 0.98 - (fVal / 100) * 0.18;
+        CONFIG.MAX_THICKNESS = parseInt(rangeThickness.value);
     }
 
     function init() {
@@ -135,29 +159,19 @@
         lastPos.x = ball.x;
         lastPos.y = ball.y;
         dCtx.clearRect(0, 0, width, height); 
-        
-        // 開始時にスライダーの値を読み込む
-        syncFriction();
-        CONFIG.MAX_THICKNESS = parseInt(document.getElementById('rangeThickness').value);
-        
+        syncSettings();
         inkTime = CONFIG.INK_TIME_LIMIT;
         isDrawing = true;
     }
 
-    // 設定スライダー操作
-    document.getElementById('rangeThickness').addEventListener('input', (e) => {
-        CONFIG.MAX_THICKNESS = parseInt(e.target.value);
-    });
-    rangeFriction.addEventListener('input', syncFriction);
+    rangeThickness.addEventListener('input', syncSettings);
+    rangeFriction.addEventListener('input', syncSettings);
 
     configBtn.addEventListener('click', (e) => { e.stopPropagation(); configPanel.classList.add('open'); });
     document.getElementById('closePanel').addEventListener('click', (e) => { e.stopPropagation(); configPanel.classList.remove('open'); });
 
-    // 初回スタート
     startOverlay.addEventListener('click', async () => {
         if (appStarted) return;
-        
-        // センサー許可
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             try {
                 const response = await DeviceOrientationEvent.requestPermission();
@@ -166,9 +180,8 @@
         } else {
             window.addEventListener('deviceorientation', handleOrientation);
         }
-
         appStarted = true;
-        startOverlay.style.display = 'none'; // オーバーレイを消す
+        startOverlay.style.display = 'none';
         init();
         update();
     });
@@ -225,34 +238,24 @@
         requestAnimationFrame(update);
     }
 
-saveBtn.addEventListener('click', async (e) => {
+    saveBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-
-        const bgMode = document.getElementById('bgSelect').value;
-        let finalCanvas;
-
-        if (bgMode === 'white') {
-            // 白背景モード：新しいCanvasを作成して合成する
-            finalCanvas = document.createElement('canvas');
-            finalCanvas.width = width;
-            finalCanvas.height = height;
-            const fCtx = finalCanvas.getContext('2d');
-
-            // 1. 白で塗りつぶす
-            fCtx.fillStyle = "white";
-            fCtx.fillRect(0, 0, width, height);
-            // 2. その上に描画内容（インク）をコピー
-            fCtx.drawImage(dCanvas, 0, 0);
-        } else {
-            // 透過モード：そのまま
-            finalCanvas = dCanvas;
+        
+        let targetCanvas = dCanvas;
+        if (bgSelect.value === 'white') {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = width; tempCanvas.height = height;
+            const tCtx = tempCanvas.getContext('2d');
+            tCtx.fillStyle = "white";
+            tCtx.fillRect(0, 0, width, height);
+            tCtx.drawImage(dCanvas, 0, 0);
+            targetCanvas = tempCanvas;
         }
 
-        // あとは共通の保存/共有フロー
-        finalCanvas.toBlob(async (blob) => {
+        targetCanvas.toBlob(async (blob) => {
             const file = new File([blob], `marble-art-${Date.now()}.png`, { type: "image/png" });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try { await navigator.share({ files: [file], title: 'Marble Art' }); } catch (err) {}
+                try { await navigator.share({ files: [file], title: 'ビー玉アート Pro' }); } catch (err) {}
             } else {
                 const link = document.createElement('a');
                 link.download = file.name; link.href = URL.createObjectURL(blob); link.click();
