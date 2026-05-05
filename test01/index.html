@@ -5,18 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Marble Ink Art Pro</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #e0e0e0; font-family: sans-serif; }
+        /* 1. 根本的な背景を白に固定 */
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: white; /* プレイ中の背景色 */
+            font-family: sans-serif; 
+        }
         
-        /* 描画レイヤー：画面上は白く見えるが、Canvasデータ（保存内容）は透明を維持する */
-        #drawingCanvas { 
-            background: white; 
-            position: absolute;
-            top: 0; left: 0;
+        /* 2. キャンバスの設定 */
+        canvas { 
+            display: block; 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            touch-action: none; 
         }
 
-        canvas { display: block; position: absolute; top: 0; left: 0; touch-action: none; }
+        /* 保存用（下側） */
+        #drawingCanvas { 
+            z-index: 1; 
+            background: transparent; /* ここは透明のまま */
+        }
+
+        /* 表示用（上側） */
+        #mainCanvas { 
+            z-index: 2; 
+            background: transparent; 
+        }
         
-        #ui { position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px; pointer-events: none; }
+        #ui { position: absolute; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px; pointer-events: none; z-index: 10; }
         .btns { display: flex; gap: 10px; }
         button { 
             padding: 15px 25px; font-size: 16px; border-radius: 30px; border: none; 
@@ -34,7 +52,7 @@
 <canvas id="mainCanvas"></canvas>
 
 <div id="ui">
-    <div id="timer">Ink: 10.0s</div>
+    <div id="timer">Ink: 20.0s</div>
     <div class="btns">
         <button id="saveBtn">透過PNGを保存</button>
         <button id="resetBtn" style="background: #555;">リセット</button>
@@ -42,19 +60,16 @@
 </div>
 
 <script>
-    /** 
-     * --- 調整用パラメータ設定 ---
-     */
     const CONFIG = {
-        INK_TIME_LIMIT: 20.0,    // 描画制限時間（秒）
-        BALL_RADIUS: 40,         // ビー玉の見た目の大きさ
-        MIN_THICKNESS: 6,        // インクの最小太さ（速く動かした時）
-        MAX_THICKNESS: 40,       // インクの最大太さ（止まっている時）
-        THICKNESS_SMOOTH: 0.15,  // 太さの変化の滑らかさ（0〜1 / 小さいほどじわじわ変わる）
-        SPEED_SENSITIVITY: 2.2,  // 速度による太さの変化率（大きいほどすぐ細くなる）
-        GRAVITY_COEFF: 0.12,     // 傾きに対する加速の強さ
-        FRICTION: 0.96,          // 摩擦（1に近いほど止まりにくい）
-        BOUNCE: -0.4             // 壁に当たった時の跳ね返り強度
+        INK_TIME_LIMIT: 20.0,
+        BALL_RADIUS: 40,
+        MIN_THICKNESS: 6,
+        MAX_THICKNESS: 40,
+        THICKNESS_SMOOTH: 0.15,
+        SPEED_SENSITIVITY: 2.2,
+        GRAVITY_COEFF: 0.12,
+        FRICTION: 0.96,
+        BOUNCE: -0.4
     };
 
     const dCanvas = document.getElementById('drawingCanvas');
@@ -67,7 +82,7 @@
 
     let width, height;
     let ball = { x: 0, y: 0, vx: 0, vy: 0 };
-    let lastPos = { x: 0, y: 0 }; // 前回の座標保存用
+    let lastPos = { x: 0, y: 0 };
     let accel = { x: 0, y: 0 };
     let currentInkThickness = CONFIG.MAX_THICKNESS;
     let inkTime = CONFIG.INK_TIME_LIMIT;
@@ -87,7 +102,7 @@
         lastPos.x = ball.x;
         lastPos.y = ball.y;
         
-        // --- 修正箇所: 透明背景にするために完全にクリアする ---
+        // 保存用キャンバスを完全に透明にする
         dCtx.clearRect(0, 0, width, height); 
         
         inkTime = CONFIG.INK_TIME_LIMIT;
@@ -96,10 +111,8 @@
         saveBtn.disabled = false;
     }
 
-    // センサー許可と開始
     async function startApp() {
         if (appStarted) return;
-        
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             try {
                 const response = await DeviceOrientationEvent.requestPermission();
@@ -110,7 +123,6 @@
         } else {
             window.addEventListener('deviceorientation', handleOrientation);
         }
-        
         appStarted = true;
         init();
         update();
@@ -128,7 +140,6 @@
         }
 
         if (isDrawing) {
-            // 物理演算
             ball.vx += accel.x;
             ball.vy += accel.y;
             ball.vx *= CONFIG.FRICTION;
@@ -136,20 +147,15 @@
             ball.x += ball.vx;
             ball.y += ball.vy;
 
-            // 壁判定
             if (ball.x < CONFIG.BALL_RADIUS) { ball.x = CONFIG.BALL_RADIUS; ball.vx *= CONFIG.BOUNCE; }
             if (ball.x > width - CONFIG.BALL_RADIUS) { ball.x = width - CONFIG.BALL_RADIUS; ball.vx *= CONFIG.BOUNCE; }
             if (ball.y < CONFIG.BALL_RADIUS) { ball.y = CONFIG.BALL_RADIUS; ball.vy *= CONFIG.BOUNCE; }
             if (ball.y > height - CONFIG.BALL_RADIUS) { ball.y = height - CONFIG.BALL_RADIUS; ball.vy *= CONFIG.BOUNCE; }
 
-            // 速度に基づいた太さ計算
             const speed = Math.sqrt(ball.vx ** 2 + ball.vy ** 2);
             const targetThickness = Math.max(CONFIG.MIN_THICKNESS, CONFIG.MAX_THICKNESS - speed * CONFIG.SPEED_SENSITIVITY);
-            
-            // 太さを滑らかに変化
             currentInkThickness += (targetThickness - currentInkThickness) * CONFIG.THICKNESS_SMOOTH;
 
-            // 描画（線で繋ぐ）
             dCtx.beginPath();
             dCtx.strokeStyle = "black";
             dCtx.lineWidth = currentInkThickness;
@@ -164,19 +170,17 @@
             inkTime -= 1/60;
         }
 
-        // 表示用更新
         mCtx.clearRect(0, 0, width, height);
+        // 背景が透けて見えるように上書き
         mCtx.drawImage(dCanvas, 0, 0);
         
         if (isDrawing) {
-            // ビー玉の見た目
             mCtx.beginPath();
-            mCtx.fillStyle = "rgba(100, 100, 100, 0.8)";
+            mCtx.fillStyle = "rgba(0, 0, 0, 0.4)"; // ビー玉本体（半透明の黒）
             mCtx.arc(ball.x, ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2);
             mCtx.fill();
-            // 光沢
             mCtx.beginPath();
-            mCtx.fillStyle = "rgba(255, 255, 255, 0.4)";
+            mCtx.fillStyle = "rgba(255, 255, 255, 0.3)"; // 光沢
             mCtx.arc(ball.x - CONFIG.BALL_RADIUS*0.3, ball.y - CONFIG.BALL_RADIUS*0.3, CONFIG.BALL_RADIUS*0.2, 0, Math.PI * 2);
             mCtx.fill();
         }
@@ -185,14 +189,12 @@
         requestAnimationFrame(update);
     }
 
-    // イベント
     window.addEventListener('click', startApp, { once: true });
     
     saveBtn.addEventListener('click', (e) => {
         e.stopPropagation(); 
         const link = document.createElement('a');
         link.download = `marble-art-${Date.now()}.png`;
-        // --- 確実にPNG形式（透過保持）で書き出す ---
         link.href = dCanvas.toDataURL("image/png");
         link.click();
     });
