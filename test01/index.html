@@ -115,9 +115,11 @@
     document.getElementById('rangeThickness').addEventListener('input', (e) => {
         CONFIG.MAX_THICKNESS = parseInt(e.target.value);
     });
-    document.getElementById('rangeFriction').addEventListener('input', (e) => {
-        CONFIG.FRICTION = parseInt(e.target.value) / 100;
-    });
+
+document.getElementById('rangeFriction').addEventListener('input', (e) => {
+    const val = parseInt(e.target.value); // 0 〜 100
+    CONFIG.FRICTION = 0.98 - (val / 100) * 0.18; 
+});
 
     // パネル開閉
     configBtn.addEventListener('click', (e) => {
