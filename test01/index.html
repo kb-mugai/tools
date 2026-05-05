@@ -64,13 +64,22 @@
         <!-- この初期値がそのまま物理演算に反映されます -->
         <input type="range" id="rangeFriction" min="0" max="100" value="20">
     </div>
+
+<div class="setting-item">
+        <label>保存時の背景色</label>
+        <select id="bgSelect" style="width: 100%; padding: 5px; pointer-events: auto;">
+            <option value="transparent">透明 (線画のみ保存)</option>
+            <option value="white">白色</option>
+        </select>
+    </div>
+
     <button id="closePanel" style="width: 100%;">閉じる</button>
 </div>
 
 <div id="ui">
     <div id="timer">Ink: 20.0s</div>
     <div class="btns">
-        <button id="saveBtn">透過保存/共有</button>
+        <button id="saveBtn">保存</button>
         <button id="resetBtn" style="background: #555;">リセット</button>
     </div>
 </div>
@@ -216,9 +225,31 @@
         requestAnimationFrame(update);
     }
 
-    saveBtn.addEventListener('click', async (e) => {
+saveBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        dCanvas.toBlob(async (blob) => {
+
+        const bgMode = document.getElementById('bgSelect').value;
+        let finalCanvas;
+
+        if (bgMode === 'white') {
+            // 白背景モード：新しいCanvasを作成して合成する
+            finalCanvas = document.createElement('canvas');
+            finalCanvas.width = width;
+            finalCanvas.height = height;
+            const fCtx = finalCanvas.getContext('2d');
+
+            // 1. 白で塗りつぶす
+            fCtx.fillStyle = "white";
+            fCtx.fillRect(0, 0, width, height);
+            // 2. その上に描画内容（インク）をコピー
+            fCtx.drawImage(dCanvas, 0, 0);
+        } else {
+            // 透過モード：そのまま
+            finalCanvas = dCanvas;
+        }
+
+        // あとは共通の保存/共有フロー
+        finalCanvas.toBlob(async (blob) => {
             const file = new File([blob], `marble-art-${Date.now()}.png`, { type: "image/png" });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 try { await navigator.share({ files: [file], title: 'Marble Art' }); } catch (err) {}
