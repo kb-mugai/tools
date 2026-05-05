@@ -191,13 +191,34 @@
 
     window.addEventListener('click', startApp, { once: true });
     
-    saveBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); 
-        const link = document.createElement('a');
-        link.download = `marble-art-${Date.now()}.png`;
-        link.href = dCanvas.toDataURL("image/png");
-        link.click();
-    });
+saveBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+
+    // 1. Canvasから画像データ（Blob）を作成
+    dCanvas.toBlob(async (blob) => {
+        const file = new File([blob], `marble-art-${Date.now()}.png`, { type: "image/png" });
+
+        // 2. Web Share APIが使えるか確認
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                // 3. 共有シートを起動
+                await navigator.share({
+                    files: [file],
+                    title: 'Marble Art',
+                    text: 'ビー玉アートで作った作品です'
+                });
+            } catch (err) {
+                console.error("Share failed", err);
+            }
+        } else {
+            // Web Share API非対応（PCなど）の場合は従来のダウンロード
+            const link = document.createElement('a');
+            link.download = file.name;
+            link.href = URL.createObjectURL(blob);
+            link.click();
+        }
+    }, "image/png");
+});
 
     resetBtn.addEventListener('click', (e) => {
         e.stopPropagation();
