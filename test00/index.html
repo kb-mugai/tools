@@ -8,14 +8,12 @@
         :root { --ui-height: 140px; }
         body { margin: 0; overflow: hidden; background-color: #f0f0f0; font-family: sans-serif; display: flex; flex-direction: column; height: 100dvh; }
         
-        /* 描画エリア */
         #canvasContainer { flex: 1; position: relative; background: white; overflow: hidden; }
         canvas { display: block; position: absolute; top: 0; left: 0; touch-action: none; }
-        #fillCanvas { z-index: 1; }    /* ③ 塗りレイヤー */
-        #lineCanvas { z-index: 2; }    /* ① 線画レイヤー */
-        #uiCanvas { z-index: 3; }      /* UI/演出用 */
+        #fillCanvas { z-index: 1; }
+        #lineCanvas { z-index: 2; }
+        #uiCanvas { z-index: 3; }
 
-        /* 操作パネル */
         #uiPanel { 
             height: var(--ui-height); background: #eee; border-top: 2px solid #ccc; 
             display: flex; flex-direction: column; align-items: center; justify-content: center; 
@@ -29,19 +27,19 @@
         }
         button:active { transform: translateY(2px); box-shadow: 0 2px 0 #000; }
         
-        /* カラーパレット */
         .color-dot { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
         .selected-color { border-color: #222; transform: scale(1.1); }
+        
+        /* 自由色選択用 */
+        #customColorPicker { width: 40px; height: 40px; border: none; padding: 0; background: none; cursor: pointer; }
 
-        /* 設定オーバーレイ */
         #configOverlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6); z-index: 100; display: none; justify-content: center; align-items: center;
         }
         #configOverlay.open { display: flex; }
-        #configPanel { width: 280px; background: white; padding: 25px; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        #configPanel { width: 280px; background: white; padding: 25px; border-radius: 25px; }
 
-        /* スタート画面 */
         #startOverlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #fff; z-index: 200; display: flex; flex-direction: column; justify-content: center; align-items: center;
@@ -63,18 +61,24 @@
     
     <div id="configOverlay">
         <div id="configPanel">
-            <h3 style="margin-top:0; text-align: center;">ブラシ設定</h3>
+            <h3 style="margin-top:0; text-align: center;">設定</h3>
             <label style="font-size:12px;">太さの最大値</label>
             <input type="range" id="rangeThickness" min="10" max="100" value="45" style="width:100%;">
-            <label style="font-size:12px; margin-top:15px; display:block;">傾きへの反応速度（粘度）</label>
+            <label style="font-size:12px; margin-top:15px; display:block;">傾きへの反応（粘度）</label>
             <input type="range" id="rangeFriction" min="0" max="100" value="25" style="width:100%;">
+            
+            <label style="font-size:12px; margin-top:15px; display:block;">保存時の背景</label>
+            <select id="bgConfig" style="width:100%; padding:8px; border-radius:10px; margin-top:5px;">
+                <option value="transparent">透過背景 (素材用)</option>
+                <option value="white" selected>白背景 (SNS・保存用)</option>
+            </select>
+
             <button id="closePanel" style="width: 100%; margin-top:25px; background: #555;">完了</button>
         </div>
     </div>
 </div>
 
 <div id="uiPanel">
-    <!-- ビー玉フェーズUI -->
     <div id="marbleUI" class="ui-row">
         <div id="timer" style="font-weight:bold; min-width:60px;">20.0s</div>
         <button id="doneBtn" style="background: #e67e22;">完了して色を塗る</button>
@@ -82,20 +86,18 @@
         <button id="configBtn">⚙️</button>
     </div>
 
-    <!-- 塗りフェーズUI -->
     <div id="paintUI" class="ui-row hidden">
-        <div id="colorPalette" style="display:flex; gap:8px;">
+        <div id="colorPalette" style="display:flex; gap:8px; align-items:center;">
             <div class="color-dot selected-color" style="background:#ff7675;" data-color="#ff7675"></div>
             <div class="color-dot" style="background:#74b9ff;" data-color="#74b9ff"></div>
             <div class="color-dot" style="background:#55efc4;" data-color="#55efc4"></div>
             <div class="color-dot" style="background:#ffeaa7;" data-color="#ffeaa7"></div>
-            <div class="color-dot" style="background:#a29bfe;" data-color="#a29bfe"></div>
-            <div class="color-dot" style="background:#2d3436;" data-color="#2d3436"></div>
+            <input type="color" id="customColorPicker" value="#a29bfe">
         </div>
     </div>
     <div id="paintUI_sub" class="ui-row hidden">
         <button id="undoBtn" style="background:#555;">戻る</button>
-        <button id="saveBtn" style="background:#2ecc71;">保存</button>
+        <button id="saveBtn" style="background:#2ecc71;">共有・保存</button>
         <button id="restartBtn" style="background:#888;">最初から</button>
         <button id="configBtn2">⚙️</button>
     </div>
@@ -110,7 +112,7 @@
         MIN_THICKNESS: 6
     };
 
-    let phase = 'marble'; // 'marble' | 'paint'
+    let phase = 'marble';
     let width, height;
     let ball = { x: 0, y: 0, vx: 0, vy: 0 };
     let lastPos = { x: 0, y: 0 };
@@ -119,11 +121,9 @@
     let selectedColor = '#ff7675';
     let undoStack = null;
 
-    // キャンバス取得
     const fCanvas = document.getElementById('fillCanvas');
     const lCanvas = document.getElementById('lineCanvas');
     const uCanvas = document.getElementById('uiCanvas');
-    // ② ガイドレイヤーはメモリ上のみに作成
     const gCanvas = document.createElement('canvas');
 
     const fCtx = fCanvas.getContext('2d', {willReadFrequently: true});
@@ -139,23 +139,14 @@
         const container = document.getElementById('canvasContainer');
         width = container.clientWidth;
         height = container.clientHeight;
-        
-        [fCanvas, lCanvas, uCanvas, gCanvas].forEach(c => {
-            c.width = width;
-            c.height = height;
-        });
-        
+        [fCanvas, lCanvas, uCanvas, gCanvas].forEach(c => { c.width = width; c.height = height; });
         ball.x = width / 2; ball.y = height / 2;
         ball.vx = ball.vy = 0;
         lastPos = { x: ball.x, y: ball.y };
-        
         lCtx.clearRect(0, 0, width, height);
         fCtx.clearRect(0, 0, width, height);
         gCtx.clearRect(0, 0, width, height);
-        inkTime = 20.0;
-        phase = 'marble';
-        undoStack = null;
-        
+        inkTime = 20.0; phase = 'marble'; undoStack = null;
         document.getElementById('marbleUI').classList.remove('hidden');
         document.getElementById('paintUI').classList.add('hidden');
         document.getElementById('paintUI_sub').classList.add('hidden');
@@ -183,35 +174,25 @@
             ball.vx *= friction; ball.vy *= friction;
             ball.x += ball.vx; ball.y += ball.vy;
 
-            // 衝突判定とサウンドフラグ
-            handleCollisions();
+            // 衝突判定
+            if (ball.x < CONFIG.BALL_RADIUS) { ball.x = CONFIG.BALL_RADIUS; if (canPlaySound.left && ball.vx < -1.0) { playHitSound(ball.vx); canPlaySound.left = false; } ball.vx *= CONFIG.BOUNCE; } else if (ball.x > CONFIG.BALL_RADIUS + CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.left = true; }
+            if (ball.x > width - CONFIG.BALL_RADIUS) { ball.x = width - CONFIG.BALL_RADIUS; if (canPlaySound.right && ball.vx > 1.0) { playHitSound(ball.vx); canPlaySound.right = false; } ball.vx *= CONFIG.BOUNCE; } else if (ball.x < width - CONFIG.BALL_RADIUS - CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.right = true; }
+            if (ball.y < CONFIG.BALL_RADIUS) { ball.y = CONFIG.BALL_RADIUS; if (canPlaySound.top && ball.vy < -1.0) { playHitSound(ball.vy); canPlaySound.top = false; } ball.vy *= CONFIG.BOUNCE; } else if (ball.y > CONFIG.BALL_RADIUS + CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.top = true; }
+            if (ball.y > height - CONFIG.BALL_RADIUS) { ball.y = height - CONFIG.BALL_RADIUS; if (canPlaySound.bottom && ball.vy > 1.0) { playHitSound(ball.vy); canPlaySound.bottom = false; } ball.vx *= CONFIG.BOUNCE; } else if (ball.y < height - CONFIG.BALL_RADIUS - CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.bottom = true; }
 
-            // 描画処理
             const speed = Math.sqrt(ball.vx**2 + ball.vy**2);
             const thick = Math.max(CONFIG.MIN_THICKNESS, document.getElementById('rangeThickness').value - speed * 2);
             
-            // ① 線画レイヤーへの書き込み
-            lCtx.beginPath();
-            lCtx.strokeStyle = "black";
-            lCtx.lineWidth = thick;
-            lCtx.lineCap = "round";
-            lCtx.moveTo(lastPos.x, lastPos.y);
-            lCtx.lineTo(ball.x, ball.y);
-            lCtx.stroke();
+            lCtx.beginPath(); lCtx.strokeStyle = "black"; lCtx.lineWidth = thick; lCtx.lineCap = "round";
+            lCtx.moveTo(lastPos.x, lastPos.y); lCtx.lineTo(ball.x, ball.y); lCtx.stroke();
 
-            // ② ガイドレイヤーへの書き込み（常に1px）
-            gCtx.beginPath();
-            gCtx.strokeStyle = "black";
-            gCtx.lineWidth = 1;
-            gCtx.moveTo(lastPos.x, lastPos.y);
-            gCtx.lineTo(ball.x, ball.y);
-            gCtx.stroke();
+            gCtx.beginPath(); gCtx.strokeStyle = "black"; gCtx.lineWidth = 1;
+            gCtx.moveTo(lastPos.x, lastPos.y); gCtx.lineTo(ball.x, ball.y); gCtx.stroke();
 
             lastPos = { x: ball.x, y: ball.y };
             inkTime -= 1/60;
             document.getElementById('timer').innerText = `${Math.max(0, inkTime).toFixed(1)}s`;
         }
-
         uCtx.clearRect(0, 0, width, height);
         if (phase === 'marble' && inkTime > 0) {
             uCtx.beginPath(); uCtx.fillStyle = "rgba(0,0,0,0.3)";
@@ -220,125 +201,77 @@
         requestAnimationFrame(update);
     }
 
-    function handleCollisions() {
-        if (ball.x < CONFIG.BALL_RADIUS) {
-            ball.x = CONFIG.BALL_RADIUS;
-            if (canPlaySound.left && ball.vx < -1.0) { playHitSound(ball.vx); canPlaySound.left = false; }
-            ball.vx *= CONFIG.BOUNCE;
-        } else if (ball.x > CONFIG.BALL_RADIUS + CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.left = true; }
-        
-        if (ball.x > width - CONFIG.BALL_RADIUS) {
-            ball.x = width - CONFIG.BALL_RADIUS;
-            if (canPlaySound.right && ball.vx > 1.0) { playHitSound(ball.vx); canPlaySound.right = false; }
-            ball.vx *= CONFIG.BOUNCE;
-        } else if (ball.x < width - CONFIG.BALL_RADIUS - CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.right = true; }
-        
-        if (ball.y < CONFIG.BALL_RADIUS) {
-            ball.y = CONFIG.BALL_RADIUS;
-            if (canPlaySound.top && ball.vy < -1.0) { playHitSound(ball.vy); canPlaySound.top = false; }
-            ball.vy *= CONFIG.BOUNCE;
-        } else if (ball.y > CONFIG.BALL_RADIUS + CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.top = true; }
-        
-        if (ball.y > height - CONFIG.BALL_RADIUS) {
-            ball.y = height - CONFIG.BALL_RADIUS;
-            if (canPlaySound.bottom && ball.vy > 1.0) { playHitSound(ball.vy); canPlaySound.bottom = false; }
-            ball.vy *= CONFIG.BOUNCE;
-        } else if (ball.y < height - CONFIG.BALL_RADIUS - CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.bottom = true; }
-    }
+    // 上書き可能なバケツ塗り
+    function floodFill(startX, startY, fillColor) {
+        undoStack = fCtx.getImageData(0, 0, width, height);
+        const imageData = fCtx.getImageData(0, 0, width, height);
+        const gPixels = gCtx.getImageData(0, 0, width, height).data;
+        const pixels = imageData.data;
+        const fillRGB = hexToRgb(fillColor);
+        const startIdx = (startY * width + startX) * 4;
 
-    // バケツ塗りアルゴリズム
-function floodFill(startX, startY, fillColor) {
-    // 1手戻すために現在の状態を保存
-    undoStack = fCtx.getImageData(0, 0, width, height);
-    
-    const imageData = fCtx.getImageData(0, 0, width, height);
-    const guideData = gCtx.getImageData(0, 0, width, height);
-    const pixels = imageData.data;
-    const gPixels = guideData.data;
+        const startColor = { r: pixels[startIdx], g: pixels[startIdx+1], b: pixels[startIdx+2], a: pixels[startIdx+3] };
+        if (gPixels[startIdx + 3] > 0) return;
+        if (startColor.r === fillRGB.r && startColor.g === fillRGB.g && startColor.b === fillRGB.b && startColor.a === 255) return;
 
-    const fillRGB = hexToRgb(fillColor);
-    const startIdx = (startY * width + startX) * 4;
-
-    // タップした場所の「現在の色」を取得
-    const startColor = {
-        r: pixels[startIdx],
-        g: pixels[startIdx + 1],
-        b: pixels[startIdx + 2],
-        a: pixels[startIdx + 3]
-    };
-
-    // --- 塗り不可の条件 ---
-    // 1. ガイド線（黒線）の上をタップした
-    if (gPixels[startIdx + 3] > 0) return;
-    // 2. 既に今選んでいる色と同じ色をタップした
-    if (startColor.r === fillRGB.r && startColor.g === fillRGB.g && startColor.b === fillRGB.b && startColor.a === 255) return;
-
-    const stack = [[startX, startY]];
-    while (stack.length > 0) {
-        const [x, y] = stack.pop();
-        let curY = y;
-
-        // 上方向に塗れる範囲を探す
-        while (curY >= 0 && canFill(x, curY)) curY--;
-        curY++;
-
-        let reachLeft = false, reachRight = false;
-        while (curY < height && canFill(x, curY)) {
-            fillPixel(x, curY);
-
-            // 左側のスキャン
-            if (x > 0) {
-                if (canFill(x - 1, curY)) {
-                    if (!reachLeft) { stack.push([x - 1, curY]); reachLeft = true; }
-                } else { reachLeft = false; }
-            }
-            // 右側のスキャン
-            if (x < width - 1) {
-                if (canFill(x + 1, curY)) {
-                    if (!reachRight) { stack.push([x + 1, curY]); reachRight = true; }
-                } else { reachRight = false; }
-            }
+        const stack = [[startX, startY]];
+        while (stack.length > 0) {
+            const [x, y] = stack.pop();
+            let curY = y;
+            while (curY >= 0 && canFill(x, curY)) curY--;
             curY++;
+            let rL = false, rR = false;
+            while (curY < height && canFill(x, curY)) {
+                const i = (curY * width + x) * 4;
+                pixels[i]=fillRGB.r; pixels[i+1]=fillRGB.g; pixels[i+2]=fillRGB.b; pixels[i+3]=255;
+                if (x > 0) { if (canFill(x-1, curY)) { if (!rL) { stack.push([x-1, curY]); rL=true; } } else rL=false; }
+                if (x < width-1) { if (canFill(x+1, curY)) { if (!rR) { stack.push([x+1, curY]); rR=true; } } else rR=false; }
+                curY++;
+            }
+        }
+        fCtx.putImageData(imageData, 0, 0);
+
+        function canFill(px, py) {
+            const i = (py * width + px) * 4;
+            return gPixels[i+3] === 0 && pixels[i]===startColor.r && pixels[i+1]===startColor.g && pixels[i+2]===startColor.b && pixels[i+3]===startColor.a;
         }
     }
-    fCtx.putImageData(imageData, 0, 0);
-
-    // 判定用関数：ガイド線の上ではなく、かつ「塗り始めた場所の色」と同じ色なら塗る
-    function canFill(px, py) {
-        const i = (py * width + px) * 4;
-        const isGuideLine = gPixels[i + 3] > 0;
-        const isSameAsStartColor = 
-            pixels[i] === startColor.r && 
-            pixels[i+1] === startColor.g && 
-            pixels[i+2] === startColor.b && 
-            pixels[i+3] === startColor.a;
-
-        return !isGuideLine && isSameAsStartColor;
-    }
-
-    function fillPixel(px, py) {
-        const i = (py * width + px) * 4;
-        pixels[i] = fillRGB.r; pixels[i+1] = fillRGB.g; pixels[i+2] = fillRGB.b; pixels[i+3] = 255;
-    }
-}
 
     function hexToRgb(hex) {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) } : null;
+        const r = parseInt(hex.slice(1,3), 16), g = parseInt(hex.slice(3,5), 16), b = parseInt(hex.slice(5,7), 16);
+        return {r, g, b};
     }
 
-    // イベントリスナー
-    document.getElementById('realStartBtn').addEventListener('click', async () => {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) {
-            await DeviceOrientationEvent.requestPermission();
-        }
-        window.addEventListener('deviceorientation', e => {
-            accel.x = (e.gamma || 0) * CONFIG.GRAVITY_COEFF;
-            accel.y = (e.beta || 0) * CONFIG.GRAVITY_COEFF;
+    // 共有・保存機能（共有シート）
+    async function shareImage() {
+        const bgType = document.getElementById('bgConfig').value;
+        const out = document.createElement('canvas');
+        out.width = width; out.height = height;
+        const ctx = out.getContext('2d');
+        
+        if (bgType === 'white') { ctx.fillStyle = "white"; ctx.fillRect(0,0,width,height); }
+        ctx.drawImage(fCanvas, 0, 0);
+        ctx.drawImage(lCanvas, 0, 0);
+
+        out.toBlob(async (blob) => {
+            const file = new File([blob], `marble-art-${Date.now()}.png`, { type: 'image/png' });
+            if (navigator.share) {
+                try {
+                    await navigator.share({ files: [file], title: 'Marble Painting', text: 'ビー玉で描いたアートです！' });
+                } catch (err) { console.log("Share failed", err); }
+            } else {
+                const a = document.createElement('a');
+                a.download = file.name; a.href = URL.createObjectURL(blob); a.click();
+            }
         });
-        document.getElementById('startOverlay').classList.add('hidden');
-        init(); update();
+    }
+
+    // イベント関係
+    document.getElementById('realStartBtn').addEventListener('click', async () => {
+        audioCtx = new AudioContext();
+        if (window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission();
+        window.addEventListener('deviceorientation', e => { accel.x = (e.gamma || 0) * CONFIG.GRAVITY_COEFF; accel.y = (e.beta || 0) * CONFIG.GRAVITY_COEFF; });
+        document.getElementById('startOverlay').classList.add('hidden'); init(); update();
     });
 
     uCanvas.addEventListener('pointerdown', e => {
@@ -356,16 +289,20 @@ function floodFill(startX, startY, fillColor) {
 
     document.querySelectorAll('.color-dot').forEach(dot => {
         dot.addEventListener('click', () => {
-            document.querySelector('.selected-color').classList.remove('selected-color');
+            document.querySelector('.selected-color')?.classList.remove('selected-color');
             dot.classList.add('selected-color');
             selectedColor = dot.dataset.color;
         });
     });
 
-    document.getElementById('undoBtn').addEventListener('click', () => {
-        if (undoStack) fCtx.putImageData(undoStack, 0, 0);
+    const picker = document.getElementById('customColorPicker');
+    picker.addEventListener('input', () => {
+        document.querySelector('.selected-color')?.classList.remove('selected-color');
+        selectedColor = picker.value;
     });
 
+    document.getElementById('saveBtn').addEventListener('click', shareImage);
+    document.getElementById('undoBtn').addEventListener('click', () => { if (undoStack) fCtx.putImageData(undoStack, 0, 0); });
     document.getElementById('resetMarbleBtn').addEventListener('click', init);
     document.getElementById('restartBtn').addEventListener('click', init);
     
@@ -373,17 +310,6 @@ function floodFill(startX, startY, fillColor) {
     document.getElementById('configBtn').addEventListener('click', toggleConfig);
     document.getElementById('configBtn2').addEventListener('click', toggleConfig);
     document.getElementById('closePanel').addEventListener('click', toggleConfig);
-    
-    document.getElementById('saveBtn').addEventListener('click', () => {
-        const out = document.createElement('canvas');
-        out.width = width; out.height = height;
-        const ctx = out.getContext('2d');
-        ctx.fillStyle = "white"; ctx.fillRect(0,0,width,height);
-        ctx.drawImage(fCanvas, 0, 0); // 塗り
-        ctx.drawImage(lCanvas, 0, 0); // 線画
-        const a = document.createElement('a');
-        a.download = `marble-art-${Date.now()}.png`; a.href = out.toDataURL(); a.click();
-    });
 </script>
 </body>
 </html>
