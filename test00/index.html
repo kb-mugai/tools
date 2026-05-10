@@ -1,27 +1,51 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <link rel="icon" href="favicon.png" type="image/png">
-    <link rel="apple-touch-icon" href="icon.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>Marble Painting | ビー玉アート</title>
     <style>
-        :root { --ui-height: 140px; }
-        body { margin: 0; overflow: hidden; background-color: #f0f0f0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
+        :root { --ui-height: 120px; }
+        /* 画面全体を動的な高さで固定 */
+        body { margin: 0; overflow: hidden; background-color: #f0f0f0; font-family: sans-serif; display: flex; flex-direction: column; height: 100dvh; }
         
-        /* キャンバスエリア */
+        /* 描画エリア */
         #canvasContainer { flex: 1; position: relative; background: white; overflow: hidden; }
         canvas { display: block; position: absolute; top: 0; left: 0; touch-action: none; }
         #drawingCanvas { z-index: 1; }
         #mainCanvas { z-index: 2; }
 
-        /* UI専用エリア */
-        #uiPanel { height: var(--ui-height); background: #eee; border-top: 2px solid #ccc; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; z-index: 10; position: relative; }
+        /* 操作パネル：ブラウザのUIに被らないよう少し余裕を持つ */
+        #uiPanel { 
+            height: var(--ui-height); background: #eee; border-top: 2px solid #ccc; 
+            display: flex; flex-direction: row; align-items: center; justify-content: space-around; 
+            z-index: 10; padding-bottom: env(safe-area-inset-bottom);
+        }
         
-        /* 操作ミス防止 */
-        button, input, select, #configPanel { touch-action: manipulation; }
+        #timer { font-size: 18px; font-weight: bold; color: #222; min-width: 80px; text-align: center; }
+        .btns { display: flex; gap: 10px; }
+        button { 
+            padding: 12px 20px; font-size: 14px; border-radius: 20px; border: none; 
+            background: #222; color: white; cursor: pointer;
+            box-shadow: 0 4px 0 #000; transition: 0.1s;
+        }
+        button:active { transform: translateY(2px); box-shadow: 0 2px 0 #000; }
+
+        /* 設定ボタン（UIエリア内の右端） */
+        #configBtn { background: #555; box-shadow: 0 4px 0 #333; font-size: 20px; }
+
+        /* 設定パネル（描画エリアに被せて表示） */
+        #configOverlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 50;
+            display: none; justify-content: center; align-items: center;
+        }
+        #configOverlay.open { display: flex; }
+        #configPanel {
+            width: 80%; max-width: 300px; background: white; padding: 25px;
+            border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            pointer-events: auto; /* 下のキャンバスを操作させない */
+        }
 
         /* スタート画面 */
         #startOverlay {
@@ -30,71 +54,49 @@
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             cursor: pointer; text-align: center;
         }
-        .start-title { font-size: 28px; font-weight: bold; margin-bottom: 10px; color: #222; }
-
-        /* ボタン・タイマー類 */
-        .btns { display: flex; gap: 15px; }
-        button { 
-            padding: 12px 24px; font-size: 16px; border-radius: 25px; border: none; 
-            background: #222; color: white; cursor: pointer;
-            box-shadow: 0 4px 0 #000; transition: 0.1s;
-        }
-        button:active { transform: translateY(2px); box-shadow: 0 2px 0 #000; }
-        #timer { font-size: 20px; font-weight: bold; color: #222; }
-
-        /* 設定パネル */
-        #configBtn { position: absolute; top: -60px; right: 20px; font-size: 24px; background: white; border: 1px solid #ccc; width: 44px; height: 44px; padding: 0; border-radius: 50%; color: #333; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-        #configPanel { 
-            position: absolute; top: 0; right: -300px; width: 260px; height: 100%; 
-            background: rgba(255, 255, 255, 0.98); z-index: 15; padding: 40px 20px;
-            box-shadow: -2px 0 10px rgba(0,0,0,0.1); transition: 0.3s;
-            overflow-y: auto; color: #333;
-        }
-        #configPanel.open { right: 0; }
-        .setting-item { margin-bottom: 20px; }
-        .setting-item label { display: block; font-size: 13px; margin-bottom: 8px; font-weight: bold; }
-        input[type=range], select { width: 100%; }
     </style>
 </head>
 <body>
 
 <div id="startOverlay">
-    <div class="start-title">ビー玉アート Pro</div>
-    <div class="start-guide">画面をタッチしてスタート</div>
+    <div style="font-size: 24px; font-weight: bold;">ビー玉アート Pro</div>
+    <div style="margin-top:10px; color:#666;">画面をタッチしてスタート</div>
 </div>
 
 <div id="canvasContainer">
     <canvas id="drawingCanvas"></canvas>
     <canvas id="mainCanvas"></canvas>
+    
+    <!-- 設定オーバーレイ（描画エリアに被せる） -->
+    <div id="configOverlay">
+        <div id="configPanel">
+            <div style="font-weight:bold; margin-bottom:20px; text-align:center;">設定</div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-size:12px;">インクの最大太さ</label>
+                <input type="range" id="rangeThickness" min="10" max="100" value="40" style="width:100%;">
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-size:12px;">インクの粘度</label>
+                <input type="range" id="rangeFriction" min="0" max="100" value="20" style="width:100%;">
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="font-size:12px;">保存時の背景</label>
+                <select id="bgSelect" style="width:100%; padding:5px;">
+                    <option value="transparent">透明 (素材用)</option>
+                    <option value="white">白色 (SNS共有用)</option>
+                </select>
+            </div>
+            <button id="closePanel" style="width: 100%;">完了</button>
+        </div>
+    </div>
 </div>
 
 <div id="uiPanel">
-    <button id="configBtn">⚙️</button>
     <div id="timer">Ink: 20.0s</div>
     <div class="btns">
         <button id="saveBtn">保存</button>
-        <button id="resetBtn" style="background: #555; box-shadow: 0 4px 0 #333;">リセット</button>
-    </div>
-
-    <!-- 設定パネル（UIエリア内に紐付け） -->
-    <div id="configPanel">
-        <div style="font-weight:bold; margin-bottom:15px; border-bottom:1px solid #ccc;">設定</div>
-        <div class="setting-item">
-            <label>インクの最大太さ</label>
-            <input type="range" id="rangeThickness" min="10" max="100" value="40">
-        </div>
-        <div class="setting-item">
-            <label>インクの粘度 (重さ)</label>
-            <input type="range" id="rangeFriction" min="0" max="100" value="20">
-        </div>
-        <div class="setting-item">
-            <label>保存時の背景</label>
-            <select id="bgSelect">
-                <option value="transparent">透明 (線画用)</option>
-                <option value="white">白色 (SNS用)</option>
-            </select>
-        </div>
-        <button id="closePanel" style="width: 100%;">閉じる</button>
+        <button id="resetBtn" style="background:#888; box-shadow:0 4px 0 #666;">リセット</button>
+        <button id="configBtn">⚙️</button>
     </div>
 </div>
 
@@ -108,7 +110,8 @@
         SPEED_SENSITIVITY: 2.2,
         GRAVITY_COEFF: 0.12,
         FRICTION: 0.96,
-        BOUNCE: -0.4
+        BOUNCE: -0.4,
+        SOUND_COOLDOWN_DIST: 15 // 壁から何px離れたら再発音を許可するか
     };
 
     const dCanvas = document.getElementById('drawingCanvas');
@@ -116,12 +119,8 @@
     const dCtx = dCanvas.getContext('2d');
     const mCtx = mCanvas.getContext('2d');
     const timerEl = document.getElementById('timer');
-    const saveBtn = document.getElementById('saveBtn');
-    const resetBtn = document.getElementById('resetBtn');
-    const configBtn = document.getElementById('configBtn');
-    const configPanel = document.getElementById('configPanel');
-    const startOverlay = document.getElementById('startOverlay');
     const container = document.getElementById('canvasContainer');
+    const configOverlay = document.getElementById('configOverlay');
 
     let width, height;
     let ball = { x: 0, y: 0, vx: 0, vy: 0 };
@@ -129,110 +128,109 @@
     let accel = { x: 0, y: 0 };
     let currentInkThickness = CONFIG.MAX_THICKNESS;
     let inkTime = CONFIG.INK_TIME_LIMIT;
-    let isDrawing = false;
-    let appStarted = false;
+    let isDrawing = false, appStarted = false;
 
-    // サウンド関連
+    // サウンド & 衝突管理
     let audioCtx = null;
     let lastSoundTime = 0;
+    let canPlaySound = { left: true, right: true, top: true, bottom: true };
 
     function playHitSound(velocity) {
-        if (!audioCtx) return;
-        const now = audioCtx.currentTime;
-        if (now - lastSoundTime < 0.06) return; // 短時間の重複再生を防ぐ
-        
+        if (!audioCtx || audioCtx.currentTime - lastSoundTime < 0.08) return;
         const speed = Math.abs(velocity);
-        if (speed < 1.5) return; // 小さな接触は鳴らさない
+        if (speed < 1.0) return;
 
-        const vol = Math.min(speed * 0.04, 0.2);
+        const vol = Math.min(speed * 0.03, 0.2);
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(160 + speed * 2, now);
-        osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
-        gain.gain.setValueAtTime(vol, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(now + 0.1);
-        lastSoundTime = now;
-    }
-
-    function syncSettings() {
-        const fVal = parseInt(document.getElementById('rangeFriction').value);
-        CONFIG.FRICTION = 0.98 - (fVal / 100) * 0.18;
-        CONFIG.MAX_THICKNESS = parseInt(document.getElementById('rangeThickness').value);
+        osc.frequency.setValueAtTime(150 + speed * 2, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        lastSoundTime = audioCtx.currentTime;
     }
 
     function init() {
+        // コンテナの実際のサイズを取得
         width = container.clientWidth;
         height = container.clientHeight;
         dCanvas.width = mCanvas.width = width;
         dCanvas.height = mCanvas.height = height;
-        ball.x = width / 2;
-        ball.y = height / 2;
+        ball.x = width / 2; ball.y = height / 2;
         ball.vx = ball.vy = 0;
-        lastPos.x = ball.x;
-        lastPos.y = ball.y;
+        lastPos.x = ball.x; lastPos.y = ball.y;
         dCtx.clearRect(0, 0, width, height); 
-        syncSettings();
         inkTime = CONFIG.INK_TIME_LIMIT;
         isDrawing = true;
     }
 
-    startOverlay.addEventListener('click', async () => {
+    document.getElementById('startOverlay').addEventListener('click', async function() {
         if (appStarted) return;
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
             const res = await DeviceOrientationEvent.requestPermission();
-            if (res === 'granted') window.addEventListener('deviceorientation', handleOrientation);
+            if (res === 'granted') window.addEventListener('deviceorientation', e => {
+                accel.x = (e.gamma || 0) * CONFIG.GRAVITY_COEFF;
+                accel.y = (e.beta || 0) * CONFIG.GRAVITY_COEFF;
+            });
         } else {
-            window.addEventListener('deviceorientation', handleOrientation);
+            window.addEventListener('deviceorientation', e => {
+                accel.x = (e.gamma || 0) * CONFIG.GRAVITY_COEFF;
+                accel.y = (e.beta || 0) * CONFIG.GRAVITY_COEFF;
+            });
         }
-        appStarted = true;
-        startOverlay.style.display = 'none';
-        init();
-        update();
+        appStarted = true; this.style.display = 'none';
+        init(); update();
     });
-
-    function handleOrientation(e) {
-        accel.x = (e.gamma || 0) * CONFIG.GRAVITY_COEFF;
-        accel.y = (e.beta || 0) * CONFIG.GRAVITY_COEFF;
-    }
 
     function update() {
         if (!appStarted) return;
         if (inkTime <= 0) { isDrawing = false; inkTime = 0; }
 
         if (isDrawing) {
-            ball.vx += accel.x;
-            ball.vy += accel.y;
-            ball.vx *= CONFIG.FRICTION;
-            ball.vy *= CONFIG.FRICTION;
-            ball.x += ball.vx;
-            ball.y += ball.vy;
+            const fVal = parseInt(document.getElementById('rangeFriction').value);
+            const friction = 0.98 - (fVal / 100) * 0.18;
+            CONFIG.MAX_THICKNESS = parseInt(document.getElementById('rangeThickness').value);
 
-            // 衝突判定とSE再生（速度の向きを確認して重複を防ぐ）
-            if (ball.x < CONFIG.BALL_RADIUS) { 
-                ball.x = CONFIG.BALL_RADIUS; 
-                if (ball.vx < -1.0) playHitSound(ball.vx); 
-                ball.vx *= CONFIG.BOUNCE; 
+            ball.vx += accel.x; ball.vy += accel.y;
+            ball.vx *= friction; ball.vy *= friction;
+            ball.x += ball.vx; ball.y += ball.vy;
+
+            // 衝突音の連続防止ロジック
+            // 左壁
+            if (ball.x < CONFIG.BALL_RADIUS) {
+                ball.x = CONFIG.BALL_RADIUS;
+                if (canPlaySound.left && ball.vx < -1.0) { playHitSound(ball.vx); canPlaySound.left = false; }
+                ball.vx *= CONFIG.BOUNCE;
+            } else if (ball.x > CONFIG.BALL_RADIUS + CONFIG.SOUND_COOLDOWN_DIST) {
+                canPlaySound.left = true;
             }
-            if (ball.x > width - CONFIG.BALL_RADIUS) { 
-                ball.x = width - CONFIG.BALL_RADIUS; 
-                if (ball.vx > 1.0) playHitSound(ball.vx); 
-                ball.vx *= CONFIG.BOUNCE; 
+            // 右壁
+            if (ball.x > width - CONFIG.BALL_RADIUS) {
+                ball.x = width - CONFIG.BALL_RADIUS;
+                if (canPlaySound.right && ball.vx > 1.0) { playHitSound(ball.vx); canPlaySound.right = false; }
+                ball.vx *= CONFIG.BOUNCE;
+            } else if (ball.x < width - CONFIG.BALL_RADIUS - CONFIG.SOUND_COOLDOWN_DIST) {
+                canPlaySound.right = true;
             }
-            if (ball.y < CONFIG.BALL_RADIUS) { 
-                ball.y = CONFIG.BALL_RADIUS; 
-                if (ball.vy < -1.0) playHitSound(ball.vy); 
-                ball.vy *= CONFIG.BOUNCE; 
+            // 上壁
+            if (ball.y < CONFIG.BALL_RADIUS) {
+                ball.y = CONFIG.BALL_RADIUS;
+                if (canPlaySound.top && ball.vy < -1.0) { playHitSound(ball.vy); canPlaySound.top = false; }
+                ball.vy *= CONFIG.BOUNCE;
+            } else if (ball.y > CONFIG.BALL_RADIUS + CONFIG.SOUND_COOLDOWN_DIST) {
+                canPlaySound.top = true;
             }
-            if (ball.y > height - CONFIG.BALL_RADIUS) { 
-                ball.y = height - CONFIG.BALL_RADIUS; 
-                if (ball.vy > 1.0) playHitSound(ball.vy); 
-                ball.vy *= CONFIG.BOUNCE; 
+            // 下壁
+            if (ball.y > height - CONFIG.BALL_RADIUS) {
+                ball.y = height - CONFIG.BALL_RADIUS;
+                if (canPlaySound.bottom && ball.vy > 1.0) { playHitSound(ball.vy); canPlaySound.bottom = false; }
+                ball.vy *= CONFIG.BOUNCE;
+            } else if (ball.y < height - CONFIG.BALL_RADIUS - CONFIG.SOUND_COOLDOWN_DIST) {
+                canPlaySound.bottom = true;
             }
 
             const speed = Math.sqrt(ball.vx ** 2 + ball.vy ** 2);
@@ -240,14 +238,10 @@
             currentInkThickness += (targetThickness - currentInkThickness) * CONFIG.THICKNESS_SMOOTH;
 
             dCtx.beginPath();
-            dCtx.strokeStyle = "black";
-            dCtx.lineWidth = currentInkThickness;
-            dCtx.lineCap = "round";
-            dCtx.lineJoin = "round";
-            dCtx.moveTo(lastPos.x, lastPos.y);
-            dCtx.lineTo(ball.x, ball.y);
+            dCtx.strokeStyle = "black"; dCtx.lineWidth = currentInkThickness;
+            dCtx.lineCap = "round"; dCtx.lineJoin = "round";
+            dCtx.moveTo(lastPos.x, lastPos.y); dCtx.lineTo(ball.x, ball.y);
             dCtx.stroke();
-
             lastPos.x = ball.x; lastPos.y = ball.y;
             inkTime -= 1/60;
         }
@@ -255,20 +249,18 @@
         mCtx.clearRect(0, 0, width, height);
         mCtx.drawImage(dCanvas, 0, 0);
         if (isDrawing) {
-            mCtx.beginPath();
-            mCtx.fillStyle = "rgba(0, 0, 0, 0.4)";
-            mCtx.arc(ball.x, ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2);
-            mCtx.fill();
+            mCtx.beginPath(); mCtx.fillStyle = "rgba(0, 0, 0, 0.4)";
+            mCtx.arc(ball.x, ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2); mCtx.fill();
         }
         timerEl.innerText = `Ink: ${Math.max(0, inkTime).toFixed(1)}s`;
         requestAnimationFrame(update);
     }
 
-    // イベントリスナー
-    configBtn.addEventListener('click', () => configPanel.classList.toggle('open'));
-    document.getElementById('closePanel').addEventListener('click', () => configPanel.classList.remove('open'));
-    resetBtn.addEventListener('click', init);
-    saveBtn.addEventListener('click', () => {
+    // UI操作
+    document.getElementById('configBtn').addEventListener('click', () => configOverlay.classList.add('open'));
+    document.getElementById('closePanel').addEventListener('click', () => configOverlay.classList.remove('open'));
+    document.getElementById('resetBtn').addEventListener('click', init);
+    document.getElementById('saveBtn').addEventListener('click', () => {
         const bg = document.getElementById('bgSelect').value;
         let outCanvas = dCanvas;
         if (bg === 'white') {
@@ -279,11 +271,11 @@
             ctx.drawImage(dCanvas, 0, 0);
         }
         outCanvas.toBlob(blob => {
-            const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.download = `marble-art-${Date.now()}.png`; a.href = url; a.click();
+            a.download = `marble-art-${Date.now()}.png`; a.href = URL.createObjectURL(blob); a.click();
         });
     });
+
     window.addEventListener('resize', init);
 </script>
 </body>
