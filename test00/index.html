@@ -167,7 +167,7 @@
         lastSoundTime = audioCtx.currentTime;
     }
 
-    function update() {
+function update() {
         if (phase === 'marble' && inkTime > 0) {
             const friction = 0.98 - (document.getElementById('rangeFriction').value / 100) * 0.18;
             ball.vx += accel.x; ball.vy += accel.y;
@@ -175,10 +175,30 @@
             ball.x += ball.vx; ball.y += ball.vy;
 
             // 衝突判定
-            if (ball.x < CONFIG.BALL_RADIUS) { ball.x = CONFIG.BALL_RADIUS; if (canPlaySound.left && ball.vx < -1.0) { playHitSound(ball.vx); canPlaySound.left = false; } ball.vx *= CONFIG.BOUNCE; } else if (ball.x > CONFIG.BALL_RADIUS + CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.left = true; }
-            if (ball.x > width - CONFIG.BALL_RADIUS) { ball.x = width - CONFIG.BALL_RADIUS; if (canPlaySound.right && ball.vx > 1.0) { playHitSound(ball.vx); canPlaySound.right = false; } ball.vx *= CONFIG.BOUNCE; } else if (ball.x < width - CONFIG.BALL_RADIUS - CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.right = true; }
-            if (ball.y < CONFIG.BALL_RADIUS) { ball.y = CONFIG.BALL_RADIUS; if (canPlaySound.top && ball.vy < -1.0) { playHitSound(ball.vy); canPlaySound.top = false; } ball.vy *= CONFIG.BOUNCE; } else if (ball.y > CONFIG.BALL_RADIUS + CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.top = true; }
-            if (ball.y > height - CONFIG.BALL_RADIUS) { ball.y = height - CONFIG.BALL_RADIUS; if (canPlaySound.bottom && ball.vy > 1.0) { playHitSound(ball.vy); canPlaySound.bottom = false; } ball.vx *= CONFIG.BOUNCE; } else if (ball.y < height - CONFIG.BALL_RADIUS - CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.bottom = true; }
+            if (ball.x < CONFIG.BALL_RADIUS) { 
+                ball.x = CONFIG.BALL_RADIUS; 
+                if (canPlaySound.left && ball.vx < -1.0) { playHitSound(ball.vx); canPlaySound.left = false; } 
+                ball.vx *= CONFIG.BOUNCE; 
+            } else if (ball.x > CONFIG.BALL_RADIUS + CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.left = true; }
+
+            if (ball.x > width - CONFIG.BALL_RADIUS) { 
+                ball.x = width - CONFIG.BALL_RADIUS; 
+                if (canPlaySound.right && ball.vx > 1.0) { playHitSound(ball.vx); canPlaySound.right = false; } 
+                ball.vx *= CONFIG.BOUNCE; 
+            } else if (ball.x < width - CONFIG.BALL_RADIUS - CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.right = true; }
+
+            if (ball.y < CONFIG.BALL_RADIUS) { 
+                ball.y = CONFIG.BALL_RADIUS; 
+                if (canPlaySound.top && ball.vy < -1.0) { playHitSound(ball.vy); canPlaySound.top = false; } 
+                ball.vy *= CONFIG.BOUNCE; 
+            } else if (ball.y > CONFIG.BALL_RADIUS + CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.top = true; }
+
+            // ★ ここを修正：ball.vx ではなく ball.vy を跳ね返らせる
+            if (ball.y > height - CONFIG.BALL_RADIUS) { 
+                ball.y = height - CONFIG.BALL_RADIUS; 
+                if (canPlaySound.bottom && ball.vy > 1.0) { playHitSound(ball.vy); canPlaySound.bottom = false; } 
+                ball.vy *= CONFIG.BOUNCE; // ← ここが vx になっていたのを vy に修正
+            } else if (ball.y < height - CONFIG.BALL_RADIUS - CONFIG.SOUND_COOLDOWN_DIST) { canPlaySound.bottom = true; }
 
             const speed = Math.sqrt(ball.vx**2 + ball.vy**2);
             const thick = Math.max(CONFIG.MIN_THICKNESS, document.getElementById('rangeThickness').value - speed * 2);
