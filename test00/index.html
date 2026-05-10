@@ -1,155 +1,290 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Perfect Reflection Card</title>
+    <link rel="icon" href="favicon.png" type="image/png">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Marble Painting | ビー玉アート</title>
     <style>
-        :root { --px: 50%; --py: 50%; --intensity: 0.5; }
-        body { background: #050505; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; overflow: hidden; }
+        :root { --ui-height: 140px; }
+        body { margin: 0; overflow: hidden; background-color: #f0f0f0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; }
         
-        .card-container {
-            position: relative;
-            width: 300px;
-            height: 420px;
-            border-radius: 15px;
-            padding: 12px;
-            background: linear-gradient(135deg, #ffd700, #fff8dc, #b8860b, #ffd700, #fff8dc);
-            background-size: 400% 400%;
-            background-position: var(--px) var(--py);
-            box-shadow: 0 15px 50px rgba(0,0,0,0.8), 0 0 20px rgba(255,215,0,0.2);
-            display: flex;
-            transition: background-position 0.1s linear; /* 反射なのでリニアな動きが自然 */
+        /* キャンバスエリア */
+        #canvasContainer { flex: 1; position: relative; background: white; overflow: hidden; }
+        canvas { display: block; position: absolute; top: 0; left: 0; touch-action: none; }
+        #drawingCanvas { z-index: 1; }
+        #mainCanvas { z-index: 2; }
+
+        /* UI専用エリア */
+        #uiPanel { height: var(--ui-height); background: #eee; border-top: 2px solid #ccc; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; z-index: 10; position: relative; }
+        
+        /* 操作ミス防止 */
+        button, input, select, #configPanel { touch-action: manipulation; }
+
+        /* スタート画面 */
+        #startOverlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.98); z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            cursor: pointer; text-align: center;
         }
+        .start-title { font-size: 28px; font-weight: bold; margin-bottom: 10px; color: #222; }
 
-        .photo-area {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            background: #111;
-            border-radius: 8px;
-            overflow: hidden;
-            z-index: 1;
+        /* ボタン・タイマー類 */
+        .btns { display: flex; gap: 15px; }
+        button { 
+            padding: 12px 24px; font-size: 16px; border-radius: 25px; border: none; 
+            background: #222; color: white; cursor: pointer;
+            box-shadow: 0 4px 0 #000; transition: 0.1s;
         }
+        button:active { transform: translateY(2px); box-shadow: 0 2px 0 #000; }
+        #timer { font-size: 20px; font-weight: bold; color: #222; }
 
-        .photo-area img { width: 100%; height: 100%; object-fit: cover; }
-
-        /* ワイド十字虹ホログラム */
-        .hologram {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-            z-index: 2;
-            mix-blend-mode: color-dodge;
-            opacity: 0.95;
-            background: 
-                linear-gradient(90deg, 
-                    transparent calc(var(--px) - 30%), 
-                    rgba(255,0,0,0.4) calc(var(--px) - 20%), 
-                    rgba(255,255,0,0.4) calc(var(--px) - 10%), 
-                    rgba(0,255,0,0.4) var(--px), 
-                    rgba(0,255,255,0.4) calc(var(--px) + 10%), 
-                    rgba(0,0,255,0.4) calc(var(--px) + 20%), 
-                    transparent calc(var(--px) + 30%)
-                ),
-                linear-gradient(0deg, 
-                    transparent calc(var(--py) - 30%), 
-                    rgba(255,0,0,0.4) calc(var(--py) - 20%), 
-                    rgba(255,255,0,0.4) calc(var(--py) - 10%), 
-                    rgba(0,255,0,0.4) var(--py), 
-                    rgba(0,255,255,0.4) calc(var(--py) + 10%), 
-                    rgba(0,0,255,0.4) calc(var(--py) + 20%), 
-                    transparent calc(var(--py) + 30%)
-                );
-            background-size: 100% 100%;
+        /* 設定パネル */
+        #configBtn { position: absolute; top: -60px; right: 20px; font-size: 24px; background: white; border: 1px solid #ccc; width: 44px; height: 44px; padding: 0; border-radius: 50%; color: #333; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        #configPanel { 
+            position: absolute; top: 0; right: -300px; width: 260px; height: 100%; 
+            background: rgba(255, 255, 255, 0.98); z-index: 15; padding: 40px 20px;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.1); transition: 0.3s;
+            overflow-y: auto; color: #333;
         }
-
-        .glitter {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            mix-blend-mode: screen;
-            opacity: calc(0.3 + var(--intensity) * 0.7);
-            background-image: 
-                radial-gradient(circle, #fff 1.2px, transparent 1.2px),
-                radial-gradient(circle, #ffd700 1.5px, transparent 1.5px),
-                radial-gradient(circle, #fff 0.8px, transparent 0.8px);
-            background-size: 20px 20px, 35px 35px, 15px 15px;
-            background-position: calc(var(--px) * 0.05) calc(var(--py) * 0.05);
-            z-index: 4;
-            pointer-events: none;
-        }
-
-        .controls { margin-top: 25px; display: flex; gap: 10px; z-index: 10; }
-        .btn { background: #ffd700; color: #111; padding: 12px 24px; border-radius: 25px; cursor: pointer; font-weight: bold; border: none; }
+        #configPanel.open { right: 0; }
+        .setting-item { margin-bottom: 20px; }
+        .setting-item label { display: block; font-size: 13px; margin-bottom: 8px; font-weight: bold; }
+        input[type=range], select { width: 100%; }
     </style>
 </head>
 <body>
 
-    <div class="card-container" id="card">
-        <div class="photo-area">
-            <img id="preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect width='100' height='100' fill='%23111'/%3E%3C/svg%3E">
-            <div class="hologram"></div>
-            <div class="glitter"></div>
+<div id="startOverlay">
+    <div class="start-title">ビー玉アート Pro</div>
+    <div class="start-guide">画面をタッチしてスタート</div>
+</div>
+
+<div id="canvasContainer">
+    <canvas id="drawingCanvas"></canvas>
+    <canvas id="mainCanvas"></canvas>
+</div>
+
+<div id="uiPanel">
+    <button id="configBtn">⚙️</button>
+    <div id="timer">Ink: 20.0s</div>
+    <div class="btns">
+        <button id="saveBtn">保存</button>
+        <button id="resetBtn" style="background: #555; box-shadow: 0 4px 0 #333;">リセット</button>
+    </div>
+
+    <!-- 設定パネル（UIエリア内に紐付け） -->
+    <div id="configPanel">
+        <div style="font-weight:bold; margin-bottom:15px; border-bottom:1px solid #ccc;">設定</div>
+        <div class="setting-item">
+            <label>インクの最大太さ</label>
+            <input type="range" id="rangeThickness" min="10" max="100" value="40">
         </div>
+        <div class="setting-item">
+            <label>インクの粘度 (重さ)</label>
+            <input type="range" id="rangeFriction" min="0" max="100" value="20">
+        </div>
+        <div class="setting-item">
+            <label>保存時の背景</label>
+            <select id="bgSelect">
+                <option value="transparent">透明 (線画用)</option>
+                <option value="white">白色 (SNS用)</option>
+            </select>
+        </div>
+        <button id="closePanel" style="width: 100%;">閉じる</button>
     </div>
+</div>
 
-    <div class="controls">
-        <label class="btn">写真をアップロード<input type="file" id="upload" accept="image/*" style="display:none;"></label>
-        <button class="btn" id="requestPermission" style="display:none;">センサー許可</button>
-    </div>
+<script>
+    const CONFIG = {
+        INK_TIME_LIMIT: 20.0,
+        BALL_RADIUS: 40,
+        MIN_THICKNESS: 6,
+        MAX_THICKNESS: 40,
+        THICKNESS_SMOOTH: 0.15,
+        SPEED_SENSITIVITY: 2.2,
+        GRAVITY_COEFF: 0.12,
+        FRICTION: 0.96,
+        BOUNCE: -0.4
+    };
 
-    <script>
-        const upload = document.getElementById('upload');
-        const preview = document.getElementById('preview');
-        const permissionBtn = document.getElementById('requestPermission');
+    const dCanvas = document.getElementById('drawingCanvas');
+    const mCanvas = document.getElementById('mainCanvas');
+    const dCtx = dCanvas.getContext('2d');
+    const mCtx = mCanvas.getContext('2d');
+    const timerEl = document.getElementById('timer');
+    const saveBtn = document.getElementById('saveBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const configBtn = document.getElementById('configBtn');
+    const configPanel = document.getElementById('configPanel');
+    const startOverlay = document.getElementById('startOverlay');
+    const container = document.getElementById('canvasContainer');
 
-        upload.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => preview.src = event.target.result;
-                reader.readAsDataURL(file);
-            }
-        });
+    let width, height;
+    let ball = { x: 0, y: 0, vx: 0, vy: 0 };
+    let lastPos = { x: 0, y: 0 };
+    let accel = { x: 0, y: 0 };
+    let currentInkThickness = CONFIG.MAX_THICKNESS;
+    let inkTime = CONFIG.INK_TIME_LIMIT;
+    let isDrawing = false;
+    let appStarted = false;
 
-        function handleOrientation(event) {
-            let { beta, gamma } = event;
-            
-            // 物理反射ロジック（上下左右すべて逆方向に光が動く）
-            let x = 50 - (gamma * 1.5); 
-            let y = 50 - (beta - 45) * 1.5;
+    // サウンド関連
+    let audioCtx = null;
+    let lastSoundTime = 0;
 
-            x = Math.max(0, Math.min(100, x));
-            y = Math.max(0, Math.min(100, y));
+    function playHitSound(velocity) {
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+        if (now - lastSoundTime < 0.06) return; // 短時間の重複再生を防ぐ
+        
+        const speed = Math.abs(velocity);
+        if (speed < 1.5) return; // 小さな接触は鳴らさない
 
-            document.documentElement.style.setProperty('--px', `${x}%`);
-            document.documentElement.style.setProperty('--py', `${y}%`);
-            
-            const intensity = (Math.abs(gamma) / 30 + Math.abs(beta - 45) / 30);
-            document.documentElement.style.setProperty('--intensity', Math.min(1, intensity));
-        }
+        const vol = Math.min(speed * 0.04, 0.2);
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(160 + speed * 2, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(now + 0.1);
+        lastSoundTime = now;
+    }
 
+    function syncSettings() {
+        const fVal = parseInt(document.getElementById('rangeFriction').value);
+        CONFIG.FRICTION = 0.98 - (fVal / 100) * 0.18;
+        CONFIG.MAX_THICKNESS = parseInt(document.getElementById('rangeThickness').value);
+    }
+
+    function init() {
+        width = container.clientWidth;
+        height = container.clientHeight;
+        dCanvas.width = mCanvas.width = width;
+        dCanvas.height = mCanvas.height = height;
+        ball.x = width / 2;
+        ball.y = height / 2;
+        ball.vx = ball.vy = 0;
+        lastPos.x = ball.x;
+        lastPos.y = ball.y;
+        dCtx.clearRect(0, 0, width, height); 
+        syncSettings();
+        inkTime = CONFIG.INK_TIME_LIMIT;
+        isDrawing = true;
+    }
+
+    startOverlay.addEventListener('click', async () => {
+        if (appStarted) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-            permissionBtn.style.display = 'inline-block';
-            permissionBtn.onclick = () => {
-                DeviceOrientationEvent.requestPermission().then(state => {
-                    if (state === 'granted') {
-                        window.addEventListener('deviceorientation', handleOrientation);
-                        permissionBtn.style.display = 'none';
-                    }
-                });
-            };
+            const res = await DeviceOrientationEvent.requestPermission();
+            if (res === 'granted') window.addEventListener('deviceorientation', handleOrientation);
         } else {
             window.addEventListener('deviceorientation', handleOrientation);
         }
+        appStarted = true;
+        startOverlay.style.display = 'none';
+        init();
+        update();
+    });
 
-        window.addEventListener('mousemove', (e) => {
-            // マウスの動きも反射に統一
-            const x = 100 - (e.clientX / window.innerWidth) * 100;
-            const y = 100 - (e.clientY / window.innerHeight) * 100;
-            document.documentElement.style.setProperty('--px', `${x}%`);
-            document.documentElement.style.setProperty('--py', `${y}%`);
+    function handleOrientation(e) {
+        accel.x = (e.gamma || 0) * CONFIG.GRAVITY_COEFF;
+        accel.y = (e.beta || 0) * CONFIG.GRAVITY_COEFF;
+    }
+
+    function update() {
+        if (!appStarted) return;
+        if (inkTime <= 0) { isDrawing = false; inkTime = 0; }
+
+        if (isDrawing) {
+            ball.vx += accel.x;
+            ball.vy += accel.y;
+            ball.vx *= CONFIG.FRICTION;
+            ball.vy *= CONFIG.FRICTION;
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // 衝突判定とSE再生（速度の向きを確認して重複を防ぐ）
+            if (ball.x < CONFIG.BALL_RADIUS) { 
+                ball.x = CONFIG.BALL_RADIUS; 
+                if (ball.vx < -1.0) playHitSound(ball.vx); 
+                ball.vx *= CONFIG.BOUNCE; 
+            }
+            if (ball.x > width - CONFIG.BALL_RADIUS) { 
+                ball.x = width - CONFIG.BALL_RADIUS; 
+                if (ball.vx > 1.0) playHitSound(ball.vx); 
+                ball.vx *= CONFIG.BOUNCE; 
+            }
+            if (ball.y < CONFIG.BALL_RADIUS) { 
+                ball.y = CONFIG.BALL_RADIUS; 
+                if (ball.vy < -1.0) playHitSound(ball.vy); 
+                ball.vy *= CONFIG.BOUNCE; 
+            }
+            if (ball.y > height - CONFIG.BALL_RADIUS) { 
+                ball.y = height - CONFIG.BALL_RADIUS; 
+                if (ball.vy > 1.0) playHitSound(ball.vy); 
+                ball.vy *= CONFIG.BOUNCE; 
+            }
+
+            const speed = Math.sqrt(ball.vx ** 2 + ball.vy ** 2);
+            const targetThickness = Math.max(CONFIG.MIN_THICKNESS, CONFIG.MAX_THICKNESS - speed * CONFIG.SPEED_SENSITIVITY);
+            currentInkThickness += (targetThickness - currentInkThickness) * CONFIG.THICKNESS_SMOOTH;
+
+            dCtx.beginPath();
+            dCtx.strokeStyle = "black";
+            dCtx.lineWidth = currentInkThickness;
+            dCtx.lineCap = "round";
+            dCtx.lineJoin = "round";
+            dCtx.moveTo(lastPos.x, lastPos.y);
+            dCtx.lineTo(ball.x, ball.y);
+            dCtx.stroke();
+
+            lastPos.x = ball.x; lastPos.y = ball.y;
+            inkTime -= 1/60;
+        }
+
+        mCtx.clearRect(0, 0, width, height);
+        mCtx.drawImage(dCanvas, 0, 0);
+        if (isDrawing) {
+            mCtx.beginPath();
+            mCtx.fillStyle = "rgba(0, 0, 0, 0.4)";
+            mCtx.arc(ball.x, ball.y, CONFIG.BALL_RADIUS, 0, Math.PI * 2);
+            mCtx.fill();
+        }
+        timerEl.innerText = `Ink: ${Math.max(0, inkTime).toFixed(1)}s`;
+        requestAnimationFrame(update);
+    }
+
+    // イベントリスナー
+    configBtn.addEventListener('click', () => configPanel.classList.toggle('open'));
+    document.getElementById('closePanel').addEventListener('click', () => configPanel.classList.remove('open'));
+    resetBtn.addEventListener('click', init);
+    saveBtn.addEventListener('click', () => {
+        const bg = document.getElementById('bgSelect').value;
+        let outCanvas = dCanvas;
+        if (bg === 'white') {
+            outCanvas = document.createElement('canvas');
+            outCanvas.width = width; outCanvas.height = height;
+            const ctx = outCanvas.getContext('2d');
+            ctx.fillStyle = "white"; ctx.fillRect(0,0,width,height);
+            ctx.drawImage(dCanvas, 0, 0);
+        }
+        outCanvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.download = `marble-art-${Date.now()}.png`; a.href = url; a.click();
         });
-    </script>
+    });
+    window.addEventListener('resize', init);
+</script>
 </body>
 </html>
